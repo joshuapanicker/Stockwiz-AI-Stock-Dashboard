@@ -2,6 +2,8 @@
 
 AI-powered stock screening and portfolio management dashboard.
 
+StockWiz combines live market data from Yahoo Finance with Claude AI to automate stock analysis and portfolio decisions. The backend is built in Python with FastAPI and exposes a set of REST and Server-Sent Events (SSE) streaming endpoints. A custom criteria engine evaluates configurable buy, watch, and sell rules against real-time fundamentals — PE ratios, revenue growth, profit margins, 52-week positioning, and market trend — classifying each stock automatically. Claude AI is integrated directly into the analysis pipeline: it receives live metrics as context and returns structured reasoning streamed token-by-token to the frontend. The frontend is a React + TypeScript single-page app with TradingView's lightweight-charts for candlestick and area charts, and Recharts for ROI, depth-of-market, portfolio performance, and allocation visualizations. All AI responses stream in real time using a typewriter effect.
+
 ## Features
 
 - **Stock Screener** — screens a configurable watchlist against buy/watch/sell criteria using live Yahoo Finance data
