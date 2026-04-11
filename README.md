@@ -19,6 +19,15 @@ AI-powered stock screening and portfolio management dashboard.
 - **Data:** Yahoo Finance via `yfinance`
 - **Charts:** TradingView lightweight-charts + Recharts
 
+## Media
+
+<img width="1710" height="980" alt="Screenshot 2026-04-11 at 3 26 21 PM" src="https://github.com/user-attachments/assets/52a1624b-3c6e-4c1f-9d86-cb0357a2c31f" />
+
+<img width="1710" height="980" alt="Screenshot 2026-04-11 at 3 26 36 PM" src="https://github.com/user-attachments/assets/7b3b26b7-8572-4c64-85aa-e395e56fa845" />
+
+<img width="1710" height="980" alt="Screenshot 2026-04-11 at 3 26 57 PM" src="https://github.com/user-attachments/assets/e1e852ec-816e-41fa-b5b7-8346df1295d2" />
+
+
 ## Setup
 
 ```bash
