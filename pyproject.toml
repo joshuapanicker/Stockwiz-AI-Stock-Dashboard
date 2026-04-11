@@ -1,0 +1,14 @@
+[project]
+name = "stockwiz"
+version = "0.1.0"
+description = "Stock screening and analysis tool with Claude AI"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "yfinance>=0.2",
+    "claude-agent-sdk",
+    "anyio",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.0",
+]
