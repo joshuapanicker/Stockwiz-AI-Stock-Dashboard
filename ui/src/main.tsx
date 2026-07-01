@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import AuthPage from "./components/AuthPage";
+import LandingPage from "./components/LandingPage";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import "./index.css";
 
@@ -19,7 +19,7 @@ function Root() {
     );
   }
 
-  return user ? <App /> : <AuthPage />;
+  return user ? <App /> : <LandingPage />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
