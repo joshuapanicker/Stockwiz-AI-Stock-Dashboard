@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, PieChart, Pie, Cell
 } from "recharts";
 import PortfolioChart from "./PortfolioChart";
-import { useAnalysis } from "../hooks/useApi";
+import { useAnalysis, useUniverseSignals } from "../hooks/useApi";
 import type { HoldingWithMetrics } from "../types";
 
 interface Props {
@@ -186,6 +186,11 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
   const hasData = holdings.some(h => h.gain_abs != null);
   const combinedHistory = useMemo(() => buildCombinedHistory(holdings), [holdings]);
 
+  // Universe signals
+  const { data: signals, loading: signalsLoading, refresh: refreshSignals } = useUniverseSignals();
+  const buySignals = signals.filter((s: any) => s.classification === "buy");
+  const watchSignals = signals.filter((s: any) => s.classification === "watch");
+
   // Allocation data for donut
   const allocationData = useMemo(() => {
     const total = holdings.reduce((s, h) => s + (h.current_price ?? 0), 0);
@@ -206,7 +211,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
   const gainUp = netEarnings >= 0;
 
   return (
-    <div className="h-full overflow-y-auto bg-bg relative">
+    <div className="h-full flex flex-col bg-bg relative overflow-hidden">
       {/* Portfolio gradient — full screen diagonal purple wash */}
       <div className="fixed inset-0 pointer-events-none z-0 gradient-reveal"
         style={{ background: "radial-gradient(ellipse 120% 80% at 0% 0%, rgba(124,58,237,0.12) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 100% 100%, rgba(109,40,217,0.10) 0%, transparent 60%)" }}
@@ -292,122 +297,194 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
           <p className="text-muted text-sm">Add stocks you've purchased to start tracking</p>
         </div>
       ) : (
-        <div className="relative z-10 px-8 pb-10 space-y-6">
+        /* ── Two-column split ── */
+        <div className="relative z-10 flex min-h-0 flex-1 gap-0 px-4 pb-6">
 
-          {/* ── Charts row ── */}
-          <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
-            {/* Combined portfolio chart — 2/3 width */}
-            <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
+          {/* ── LEFT: charts + stats + holdings ── */}
+          <div className="flex-1 min-w-0 overflow-y-auto pr-3 space-y-5">
+
+            {/* Charts row */}
+            <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
+              <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5">
+                <div className="mb-4">
                   <p className="text-white font-semibold text-sm">Portfolio Performance</p>
                   <p className="text-muted text-xs mt-0.5">Combined value over time</p>
                 </div>
+                {combinedHistory.length > 1 ? (
+                  <ResponsiveContainer width="100%" height={160}>
+                    <AreaChart data={combinedHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="combGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
+                        tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
+                      <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
+                        tickFormatter={v => `$${v.toFixed(0)}`} domain={["auto", "auto"]} />
+                      <Tooltip content={<CombinedChartTooltip />} />
+                      <Area type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2}
+                        fill="url(#combGrad)" dot={false}
+                        activeDot={{ r: 4, fill: "#7c3aed", stroke: "#131318", strokeWidth: 2 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="chart-skeleton h-[160px]" />
+                )}
               </div>
-              {combinedHistory.length > 1 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <AreaChart data={combinedHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="combGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
-                    <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={v => `$${v.toFixed(0)}`} domain={["auto", "auto"]} />
-                    <Tooltip content={<CombinedChartTooltip />} />
-                    <Area type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2}
-                      fill="url(#combGrad)" dot={false}
-                      activeDot={{ r: 4, fill: "#7c3aed", stroke: "#131318", strokeWidth: 2 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="chart-skeleton h-[180px]" />
-              )}
-            </div>
 
-            {/* Allocation donut — 1/3 width */}
-            <div className="bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col">
-              <p className="text-white font-semibold text-sm mb-1">Allocation</p>
-              <p className="text-muted text-xs mb-4">By current value</p>
-              {allocationData.length > 0 ? (
-                <>
-                  <div className="flex-1 flex items-center justify-center">
-                    <PieChart width={140} height={140}>
-                      <Pie data={allocationData} cx={65} cy={65} innerRadius={42} outerRadius={65}
-                        paddingAngle={3} dataKey="value">
-                        {allocationData.map((_, i) => (
-                          <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<DonutTooltip />} />
-                    </PieChart>
-                  </div>
-                  <div className="space-y-1.5 mt-2">
-                    {allocationData.map((d, i) => (
-                      <div key={d.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
-                          <span className="text-white font-mono">{d.name}</span>
+              <div className="bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col">
+                <p className="text-white font-semibold text-sm mb-1">Allocation</p>
+                <p className="text-muted text-xs mb-3">By current value</p>
+                {allocationData.length > 0 ? (
+                  <>
+                    <div className="flex items-center justify-center">
+                      <PieChart width={120} height={120}>
+                        <Pie data={allocationData} cx={55} cy={55} innerRadius={34} outerRadius={55}
+                          paddingAngle={3} dataKey="value">
+                          {allocationData.map((_, i) => (
+                            <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<DonutTooltip />} />
+                      </PieChart>
+                    </div>
+                    <div className="space-y-1 mt-2">
+                      {allocationData.map((d, i) => (
+                        <div key={d.name} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                            <span className="text-white font-mono">{d.name}</span>
+                          </div>
+                          <span className="text-muted">{d.value}%</span>
                         </div>
-                        <span className="text-muted">{d.value}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-muted text-xs">No data</div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Stats row ── */}
-          <div className="grid grid-cols-4 gap-3 stagger anim-fade-up" style={{ animationDelay: "160ms" }}>
-            {[
-              {
-                label: "Net P&L", value: hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toFixed(2)}` : "—",
-                color: !hasData ? "text-muted" : gainUp ? "text-green" : "text-red",
-                sub: "Total unrealized earnings"
-              },
-              {
-                label: "Avg Return", value: `${avgGain >= 0 ? "+" : ""}${(avgGain * 100).toFixed(2)}%`,
-                color: avgGain >= 0 ? "text-green" : "text-red",
-                sub: "Mean gain across positions"
-              },
-              {
-                label: "Positions", value: String(holdings.length),
-                color: "text-white", sub: "Active holdings"
-              },
-              {
-                label: "Sell Signals", value: String(sellCount),
-                color: sellCount > 0 ? "text-red" : "text-green",
-                sub: sellCount > 0 ? "Action required" : "All positions healthy"
-              },
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className="bg-card2 rounded-2xl px-5 py-4 border border-border/40">
-                <p className="text-muted text-xs">{label}</p>
-                <p className={clsx("font-mono text-2xl font-bold mt-1", color)}>{value}</p>
-                <p className="text-muted text-[10px] mt-1">{sub}</p>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-muted text-xs">No data</div>
+                )}
               </div>
-            ))}
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-3 stagger anim-fade-up" style={{ animationDelay: "160ms" }}>
+              {[
+                { label: "Net P&L", value: hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toFixed(2)}` : "—",
+                  color: !hasData ? "text-muted" : gainUp ? "text-green" : "text-red", sub: "Unrealized earnings" },
+                { label: "Avg Return", value: `${avgGain >= 0 ? "+" : ""}${(avgGain * 100).toFixed(2)}%`,
+                  color: avgGain >= 0 ? "text-green" : "text-red", sub: "Mean gain" },
+                { label: "Positions", value: String(holdings.length),
+                  color: "text-white", sub: "Active holdings" },
+                { label: "Sell Signals", value: String(sellCount),
+                  color: sellCount > 0 ? "text-red" : "text-green",
+                  sub: sellCount > 0 ? "Action required" : "All clear" },
+              ].map(({ label, value, color, sub }) => (
+                <div key={label} className="bg-card2 rounded-2xl px-4 py-3 border border-border/40">
+                  <p className="text-muted text-xs">{label}</p>
+                  <p className={clsx("font-mono text-xl font-bold mt-1", color)}>{value}</p>
+                  <p className="text-muted text-[10px] mt-0.5">{sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Holdings list */}
+            <div className="anim-fade-up" style={{ animationDelay: "220ms" }}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-white font-semibold">Positions</p>
+                <p className="text-muted text-xs">{holdings.length} holdings · click to expand</p>
+              </div>
+              <div className="space-y-2">
+                {loading ? (
+                  <div className="text-muted text-sm text-center py-12">Loading...</div>
+                ) : (
+                  holdings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* ── Holdings list ── */}
-          <div className="anim-fade-up" style={{ animationDelay: "240ms" }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white font-semibold">Positions</p>
-              <p className="text-muted text-xs">{holdings.length} holdings · click to expand</p>
+          {/* ── Vertical divider ── */}
+          <div className="w-px bg-border/50 flex-shrink-0 mx-1" />
+
+          {/* ── RIGHT: screener signals ── */}
+          <div className="w-[420px] flex-shrink-0 overflow-y-auto pl-4 space-y-4">
+            <div className="pt-1 pb-1 flex items-center justify-between sticky top-0 bg-bg z-10">
+              <div>
+                <p className="text-white font-semibold text-sm">Screener Signals</p>
+                <p className="text-muted text-xs">From universe — top stocks by market cap</p>
+              </div>
+              <button onClick={refreshSignals} disabled={signalsLoading}
+                className="text-muted hover:text-green transition-colors p-1 rounded-lg hover:bg-white/5">
+                <RefreshCw size={12} className={signalsLoading ? "animate-spin text-green" : ""} />
+              </button>
             </div>
-            <div className="space-y-2">
-              {loading ? (
-                <div className="text-muted text-sm text-center py-12">Loading...</div>
-              ) : (
-                holdings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
-              )}
-            </div>
+
+            {signalsLoading ? (
+              <div className="space-y-2">
+                {[1,2,3,4].map(i => <div key={i} className="chart-skeleton h-14 rounded-xl" />)}
+              </div>
+            ) : (
+              <>
+                {/* Buy signals */}
+                {buySignals.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green inline-block" />
+                      Buy ({buySignals.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {buySignals.map((s: any) => (
+                        <div key={s.symbol} className="bg-green/5 border border-green/20 rounded-xl px-4 py-3 flex items-center justify-between">
+                          <div>
+                            <p className="font-mono font-semibold text-white text-sm">{s.symbol}</p>
+                            <p className="text-muted text-[10px]">{s.metrics?.sector ?? "—"}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-white text-sm">${s.metrics?.close_price?.toFixed(2) ?? "—"}</p>
+                            <p className="text-green text-[10px]">{s.buy_result?.rules_met}/{s.buy_result?.rules_total} rules</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Watch signals */}
+                {watchSignals.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+                      Watch ({watchSignals.length})
+                    </p>
+                    <div className="space-y-1.5">
+                      {watchSignals.map((s: any) => (
+                        <div key={s.symbol} className="bg-purple/5 border border-purple/20 rounded-xl px-4 py-3 flex items-center justify-between">
+                          <div>
+                            <p className="font-mono font-semibold text-white text-sm">{s.symbol}</p>
+                            <p className="text-muted text-[10px]">{s.metrics?.sector ?? "—"}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-white text-sm">${s.metrics?.close_price?.toFixed(2) ?? "—"}</p>
+                            <p className="text-purple-400 text-[10px]">{s.watch_result?.rules_met}/{s.watch_result?.rules_total} rules</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {buySignals.length === 0 && watchSignals.length === 0 && (
+                  <div className="text-muted text-xs text-center py-8 bg-white/[0.02] rounded-xl border border-border/30">
+                    {signals.length === 0
+                      ? "Universe cache still loading — check back shortly"
+                      : "No buy or watch signals at current market conditions"}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
