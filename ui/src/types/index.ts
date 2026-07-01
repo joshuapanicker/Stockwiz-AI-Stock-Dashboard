@@ -88,3 +88,56 @@ export interface AnalysisResult {
   criteria_result: CriteriaResult;
   analysis_text: string;
 }
+
+// ── Universe types ─────────────────────────────────────────────────────────
+
+export interface UniverseFilters {
+  sector?: string | null;
+  max_forward_pe?: number | null;
+  max_trailing_pe?: number | null;
+  min_revenue_growth?: number | null;
+  min_profit_margin?: number | null;
+  min_earnings_growth?: number | null;
+  near_52w_low_pct?: number | null;
+  min_market_cap?: number | null;
+  limit?: number;
+  order_by?: string;
+  intent_summary?: string;
+}
+
+export interface UniverseStock {
+  symbol: string;
+  close_price: number | null;
+  low_52_week: number | null;
+  high_52_week: number | null;
+  trailing_pe: number | null;
+  forward_pe: number | null;
+  profit_margin: number | null;
+  operating_margin: number | null;
+  revenue_growth: number | null;
+  earnings_growth: number | null;
+  market_cap: number | null;
+  sector: string | null;
+  industry: string | null;
+  distance_to_low_pct: number | null;
+  distance_to_high_pct: number | null;
+  closer_to_52w_low: boolean;
+  last_updated: number | null;
+  fetch_error: string | null;
+}
+
+export interface UniverseStatus {
+  cached: number;
+  total: number;
+  fetching: boolean;
+  fetched_this_cycle: number;
+  cycle_total: number;
+  last_run: number | null;
+}
+
+export interface AgentFilterResult {
+  type: "results";
+  filters: UniverseFilters;
+  results: UniverseStock[];
+  total_matched: number;
+}
