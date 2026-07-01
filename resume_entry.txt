@@ -1,0 +1,9 @@
+StockWiz — AI Stock Screening & Portfolio Dashboard
+
+Built a full-stack AI dashboard integrating Claude claude-haiku-4-5-20251001 with Yahoo Finance (yfinance) to automate stock classification
+Designed a FastAPI backend with SSE streaming endpoints that pipe Claude responses token-by-token to the frontend
+Engineered a configurable criteria engine evaluating PE ratios, revenue growth, and 52-week positioning against JSON-defined rules
+Injected live yfinance market data into Claude's system prompt at request time to ground AI analysis in real data
+Built a React + TypeScript frontend with TradingView and Recharts for candlestick, ROI, and portfolio visualizations
+
+Tech: Python, FastAPI, Anthropic Claude API, Yahoo Finance API (yfinance), React, TypeScript, Vite, Tailwind CSS
