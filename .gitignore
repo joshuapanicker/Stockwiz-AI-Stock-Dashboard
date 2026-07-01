@@ -13,3 +13,9 @@ data/portfolio.json
 
 # macOS
 .DS_Store
+
+# Universe SQLite DB (auto-populated at runtime)
+data/universe.db
+
+# Editor
+.vscode/
