@@ -6,19 +6,17 @@ import CandlestickChart from "./components/CandlestickChart";
 import AreaChart from "./components/AreaChart";
 import ROIChart from "./components/ROIChart";
 import DepthChart from "./components/DepthChart";
-import StockTable from "./components/StockTable";
+import UniverseTable from "./components/UniverseTable";
 import StockDetailPanel from "./components/StockDetailPanel";
 import PortfolioTab from "./components/PortfolioTab";
 import GeneralChat from "./components/GeneralChat";
-import SearchBar from "./components/SearchBar";
 import MarketBar from "./components/MarketBar";
 
-import { useScreener, usePriceHistory, usePortfolio, useMarket, useAnalysis } from "./hooks/useApi";
+import { useScreener, usePriceHistory, usePortfolio, useMarket } from "./hooks/useApi";
 import { generateDepthData } from "./utils/mockDepth";
 import type { ScreenedStock, HoldingWithMetrics } from "./types";
 
 type Tab = "analysis" | "portfolio" | "chat";
-type LeftTab = "buy" | "watch";
 
 function toROIData(history: any[]) {
   if (!history.length) return [];
@@ -79,9 +77,7 @@ function NavBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("analysis");
-  const [leftTab, setLeftTab] = useState<LeftTab>("buy");
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [searchSymbol, setSearchSymbol] = useState<string | null>(null);
   const [rightWidth, setRightWidth] = useState(340);
 
   const rightColRef = useRef<HTMLDivElement>(null);
@@ -89,23 +85,14 @@ export default function App() {
   const onLRDivider = makeDragger(setRightWidth, () => rightWidth, "x",
     (d, s) => Math.min(600, Math.max(260, s - d)));
 
-  const { data: screened, loading: screenLoading, refresh } = useScreener();
+  const { data: screened, loading: screenLoading } = useScreener();
   const market = useMarket();
   const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding } = usePortfolio();
 
-  const buyStocks = useMemo(() => screened.filter((s: ScreenedStock) => s.classification === "buy"), [screened]);
-  const watchStocks = useMemo(() => screened.filter((s: ScreenedStock) => s.classification === "watch"), [screened]);
-
-  const defaultSymbol = useMemo(() => {
-    return (leftTab === "buy" ? buyStocks : watchStocks)[0]?.symbol ?? null;
-  }, [leftTab, buyStocks, watchStocks]);
-
-  const activeSymbol = selectedSymbol ?? searchSymbol ?? defaultSymbol;
+  const activeSymbol = selectedSymbol;
 
   const { data: featuredHistory } = usePriceHistory(activeSymbol, "1y");
   const { data: featuredHistory6m } = usePriceHistory(activeSymbol, "6mo");
-  const { data: searchHistory } = usePriceHistory(searchSymbol, "1y");
-  const { data: searchAnalysis } = useAnalysis(searchSymbol, "buy");
 
   const selectedStock = useMemo(
     () => screened.find((s: ScreenedStock) => s.symbol === activeSymbol) ?? null,
@@ -125,11 +112,9 @@ export default function App() {
   const featuredAreaData = featuredHistory.map((d: any) => ({ date: d.date, close: d.close }));
   const roiData = toROIData(featuredHistory6m.map((d: any) => ({ date: d.date, close: d.close })));
   const depthData = useMemo(() => {
-    const price = screened.find((s: ScreenedStock) => s.symbol === activeSymbol)?.metrics?.close_price ?? 100;
+    const price = selectedStock?.metrics?.close_price ?? 100;
     return generateDepthData(price);
-  }, [activeSymbol, screened]);
-
-  const currentStocks = leftTab === "buy" ? buyStocks : watchStocks;
+  }, [selectedStock]);
 
   return (
     <div className="h-screen bg-bg text-white font-sans flex flex-col overflow-hidden">
@@ -159,13 +144,9 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-2 flex-shrink-0 min-w-0 stagger">
                   <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-white/80 bg-card2 px-3 py-1 rounded-lg">Watchlists</span>
+                      <span className="text-xs font-medium text-white/80 bg-card2 px-3 py-1 rounded-lg">Stock Search Engine</span>
                       <div className="flex items-center gap-2">
                         {activeSymbol && <span className="text-xs text-muted font-mono truncate max-w-[80px]">{activeSymbol}</span>}
-                        <button onClick={refresh} disabled={screenLoading}
-                          className="text-muted hover:text-green transition-colors p-1 rounded-lg hover:bg-white/5 flex-shrink-0">
-                          <RefreshCw size={12} className={screenLoading ? "animate-spin text-green" : ""} />
-                        </button>
                       </div>
                     </div>
                     {featuredHistory.length > 0
@@ -201,31 +182,13 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Stock table — scrollable */}
+                {/* Universe table — scrollable */}
                 <div className="bg-card rounded-2xl border border-border/50 flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 anim-fade-up" style={{ animationDelay: "150ms" }}>
-                  <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-border flex-shrink-0 min-w-0">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="flex gap-1 bg-card2 rounded-lg p-0.5 flex-shrink-0">
-                        {(["buy", "watch"] as LeftTab[]).map(t => (
-                          <button key={t} onClick={() => setLeftTab(t)}
-                            className={clsx("px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
-                              leftTab === t
-                                ? t === "buy" ? "bg-green/15 text-green" : "bg-purple/20 text-purple-300"
-                                : "text-muted hover:text-white")}>
-                            {t === "buy" ? `Buy (${buyStocks.length})` : `Watch (${watchStocks.length})`}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex-1 min-w-0 max-w-[200px]">
-                        <SearchBar onSelect={s => { setSearchSymbol(s); setSelectedSymbol(null); }} />
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted flex-shrink-0 ml-2">{screenLoading ? "Scanning..." : `${currentStocks.length} stocks`}</span>
-                  </div>
-                  <div className="overflow-y-auto flex-1">
-                    <StockTable stocks={currentStocks} selected={selectedSymbol}
-                      onSelect={s => { setSelectedSymbol(s); setSearchSymbol(null); }} mode={leftTab} />
-                  </div>
+                  <UniverseTable
+                    selected={selectedSymbol}
+                    onSelect={s => setSelectedSymbol(s)}
+                    onFirstLoad={s => { if (!selectedSymbol) setSelectedSymbol(s); }}
+                  />
                 </div>
               </div>
 
@@ -242,8 +205,6 @@ export default function App() {
                 <div className="bg-card rounded-2xl border border-border/50 overflow-hidden flex-1 min-h-0">
                   {selectedStock ? (
                     <StockDetailPanel stock={selectedStock} onClose={() => setSelectedSymbol(null)} onAddToPortfolio={addHolding} />
-                  ) : searchSymbol ? (
-                    <SearchResultPanel symbol={searchSymbol} history={searchHistory} analysis={searchAnalysis} onClose={() => setSearchSymbol(null)} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-muted text-xs">
                       {screenLoading ? "Loading..." : "Select a stock"}
@@ -272,49 +233,6 @@ export default function App() {
           <div key="chat" className="flex-1 min-h-0 overflow-hidden anim-fade-in">
             <GeneralChat />
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────
-
-function SearchResultPanel({ symbol, history, analysis, onClose }: {
-  symbol: string; history: any[]; analysis: any; onClose: () => void;
-}) {
-  const areaData = history.map((d: any) => ({ date: d.date, close: d.close }));
-  const depthData = generateDepthData(history[history.length - 1]?.close ?? 100);
-
-  return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border flex-shrink-0">
-        <div>
-          <span className="text-white font-bold text-lg font-mono">{symbol}</span>
-          <p className="text-muted text-xs mt-0.5">Search result</p>
-        </div>
-        <button onClick={onClose} className="text-muted hover:text-white text-xs px-2 py-1 bg-card2 rounded-lg">✕</button>
-      </div>
-      <div className="px-4 pt-3 flex-shrink-0">
-        <p className="text-xs text-muted mb-2">Price (1Y)</p>
-        {areaData.length > 0
-          ? <AreaChart data={areaData} height={190} color="#7c3aed" />
-          : <div className="flex items-center justify-center h-[190px] text-muted text-xs">Loading...</div>}
-      </div>
-      <div className="px-4 pt-3 flex-shrink-0">
-        <p className="text-xs text-muted mb-2">Depth of market</p>
-        <DepthChart data={depthData} height={120} />
-      </div>
-      <div className="px-4 pt-3 pb-4 flex-shrink-0">
-        <p className="text-xs text-muted mb-2">Why this stock isn't optimal right now</p>
-        {analysis?.analysis_text ? (
-          <div className="bg-card2 rounded-lg p-3 text-xs text-white leading-relaxed space-y-1">
-            {analysis.analysis_text.split("\n").filter(Boolean).map((line: string, i: number) => (
-              <p key={i} className={line.startsWith("-") ? "pl-2" : ""}>{line}</p>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-card2 rounded-lg p-3 text-xs text-muted animate-pulse">Analyzing {symbol}...</div>
         )}
       </div>
     </div>
