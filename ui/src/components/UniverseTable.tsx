@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from "react";
 import clsx from "clsx";
-import { Send, Bot, RefreshCw, X, SlidersHorizontal, Sparkles, Database, User, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Bot, RefreshCw, X, SlidersHorizontal, Sparkles, Database, User, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { apiFetch, useUniverseStatus, useUniverseSectors } from "../hooks/useApi";
 import type { UniverseStock, UniverseFilters } from "../types";
 
@@ -228,12 +228,13 @@ function ConversationThread({ messages, replyInput, onReplyChange, onReplySend, 
 // ── Stock row ──────────────────────────────────────────────────────────────
 
 function Row({ stock, rank, selected, onSelect }: {
-  stock: UniverseStock; rank: number; selected: boolean; onSelect: (s: string) => void;
+  stock: UniverseStock; rank: number; selected: boolean;
+  onSelect: (s: string, m: UniverseStock) => void;
 }) {
   const revGrowth = stock.revenue_growth;
   const revColor = revGrowth == null ? "text-muted" : revGrowth >= 0 ? "text-green" : "text-red";
   return (
-    <tr onClick={() => onSelect(stock.symbol)}
+    <tr onClick={() => onSelect(stock.symbol, stock)}
       className={clsx("border-b border-border/40 cursor-pointer transition-colors text-xs",
         selected ? "bg-card2" : "hover:bg-white/[0.02]")}>
       <td className="py-2 px-2 text-muted font-mono text-[10px] w-6 text-center">{rank}</td>
@@ -278,10 +279,11 @@ const QUICK = [
 
 // ── Main export ────────────────────────────────────────────────────────────
 
-export default function UniverseTable({ selected, onSelect, onFirstLoad }: {
+export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenCriteria }: {
   selected: string | null;
-  onSelect: (symbol: string) => void;
+  onSelect: (symbol: string, metrics?: UniverseStock | null) => void;
   onFirstLoad?: (symbol: string) => void;
+  onOpenCriteria?: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
@@ -445,6 +447,12 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad }: {
           <span className="text-[10px] text-muted">
             {hasActiveFilter ? `${displayResults.length} results` : `${displayResults.length} stocks`}
           </span>
+          {onOpenCriteria && (
+            <button onClick={onOpenCriteria} title="Edit screening criteria"
+              className="flex items-center gap-1 text-muted hover:text-green transition-colors p-1 rounded-lg hover:bg-white/5">
+              <Settings size={11} />
+            </button>
+          )}
           <button
             onClick={() => setShowFilters(v => !v)}
             className={clsx(
@@ -563,7 +571,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad }: {
                 <tbody>
                   {displayResults.map((s, i) => (
                     <Row key={s.symbol} stock={s} rank={i + 1}
-                      selected={selected === s.symbol} onSelect={onSelect} />
+                      selected={selected === s.symbol} onSelect={(sym, m) => onSelect(sym, m)} />
                   ))}
                 </tbody>
               </table>
@@ -597,7 +605,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad }: {
               <tbody>
                 {displayResults.map((s, i) => (
                   <Row key={s.symbol} stock={s} rank={i + 1}
-                    selected={selected === s.symbol} onSelect={onSelect} />
+                    selected={selected === s.symbol} onSelect={(sym, m) => onSelect(sym, m)} />
                 ))}
               </tbody>
             </table>
