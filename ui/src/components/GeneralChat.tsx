@@ -221,7 +221,7 @@ export default function GeneralChat() {
             </div>
           </div>
           <button onClick={newChat}
-            className="flex items-center gap-1.5 text-xs text-muted hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-colors">
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-colors mr-10">
             <Plus size={11} />New chat
           </button>
         </div>
