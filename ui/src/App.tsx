@@ -1,19 +1,22 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import clsx from "clsx";
-import { Briefcase, MessageSquare, BarChart2, RefreshCw } from "lucide-react";
+import { Briefcase, MessageSquare, BarChart2, User, Settings } from "lucide-react";
 
 import CandlestickChart from "./components/CandlestickChart";
 import AreaChart from "./components/AreaChart";
 import ROIChart from "./components/ROIChart";
-import DepthChart from "./components/DepthChart";
+import VolumeProfileChart from "./components/VolumeProfileChart";
 import UniverseTable from "./components/UniverseTable";
 import StockDetailPanel from "./components/StockDetailPanel";
+import UniverseStockPanel from "./components/UniverseStockPanel";
 import PortfolioTab from "./components/PortfolioTab";
 import GeneralChat from "./components/GeneralChat";
 import MarketBar from "./components/MarketBar";
+import ProfilePanel from "./components/ProfilePanel";
+import SettingsPage from "./components/SettingsPage";
+import { useAuth } from "./context/AuthContext";
 
 import { useScreener, usePriceHistory, usePortfolio, useMarket } from "./hooks/useApi";
-import { generateDepthData } from "./utils/mockDepth";
 import type { ScreenedStock, HoldingWithMetrics } from "./types";
 
 type Tab = "analysis" | "portfolio" | "chat";
@@ -77,8 +80,17 @@ function NavBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("analysis");
-  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>("AAPL");
+  const [selectedUniverseMetrics, setSelectedUniverseMetrics] = useState<any | null>(null);
   const [rightWidth, setRightWidth] = useState(340);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"criteria" | "notifications" | "security">("criteria");
+
+  function openSettings(tab: "criteria" | "notifications" | "security" = "criteria") {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }
 
   const rightColRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +102,6 @@ export default function App() {
   const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding } = usePortfolio();
 
   const activeSymbol = selectedSymbol;
-
   const { data: featuredHistory } = usePriceHistory(activeSymbol, "1y");
   const { data: featuredHistory6m } = usePriceHistory(activeSymbol, "6mo");
 
@@ -109,15 +120,47 @@ export default function App() {
     history: h.history ?? [],
   })), [portfolio]);
 
+  const portfolioStats = useMemo(() => {
+    const netPnl = enrichedHoldings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
+    const avgGain = enrichedHoldings.length
+      ? enrichedHoldings.reduce((s, h) => s + (h.gain_pct ?? 0), 0) / enrichedHoldings.length
+      : null;
+    return {
+      holdings: enrichedHoldings.length,
+      netPnl: enrichedHoldings.some(h => h.gain_abs != null) ? netPnl : null,
+      avgGain: enrichedHoldings.length ? avgGain : null,
+      sellSignals: enrichedHoldings.filter(h => h.sell_result?.passed).length,
+    };
+  }, [enrichedHoldings]);
+
   const featuredAreaData = featuredHistory.map((d: any) => ({ date: d.date, close: d.close }));
   const roiData = toROIData(featuredHistory6m.map((d: any) => ({ date: d.date, close: d.close })));
-  const depthData = useMemo(() => {
-    const price = selectedStock?.metrics?.close_price ?? 100;
-    return generateDepthData(price);
-  }, [selectedStock]);
 
   return (
     <div className="h-screen bg-bg text-white font-sans flex flex-col overflow-hidden">
+
+      {/* ── Fixed top-right profile button ── */}
+      <button
+        onClick={() => setProfileOpen(true)}
+        className="fixed top-[6px] right-3 z-50 w-9 h-9 rounded-xl bg-card/90 backdrop-blur-md border border-border/60 shadow-2xl flex items-center justify-center text-muted hover:text-white hover:border-green/40 transition-all"
+        title="Profile">
+        <User size={15} />
+      </button>
+
+      {/* ── Profile slide-in panel ── */}
+      <ProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onOpenSettings={openSettings}
+        portfolioStats={portfolioStats}
+      />
+
+      {/* ── Settings full-screen page ── */}
+      <SettingsPage
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
+      />
 
       {/* ── Floating top nav — fixed, same height as search bar ── */}
       <NavBar tab={tab} setTab={setTab} />
@@ -175,10 +218,14 @@ export default function App() {
                   </div>
                   <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-white">Depth of market</p>
+                      <p className="text-xs font-semibold text-white">Volume Profile</p>
                       <span className="text-xs text-muted font-mono truncate max-w-[60px]">{activeSymbol ?? "—"}</span>
                     </div>
-                    <DepthChart data={depthData} height={150} />
+                    <VolumeProfileChart
+                      history={featuredHistory}
+                      currentPrice={selectedStock?.metrics?.close_price ?? null}
+                      height={150}
+                    />
                   </div>
                 </div>
 
@@ -186,8 +233,9 @@ export default function App() {
                 <div className="bg-card rounded-2xl border border-border/50 flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 anim-fade-up" style={{ animationDelay: "150ms" }}>
                   <UniverseTable
                     selected={selectedSymbol}
-                    onSelect={s => setSelectedSymbol(s)}
-                    onFirstLoad={s => { if (!selectedSymbol) setSelectedSymbol(s); }}
+                    onSelect={(s, metrics) => { setSelectedSymbol(s); setSelectedUniverseMetrics(metrics ?? null); }}
+                    onFirstLoad={s => setSelectedSymbol(s)}
+                    onOpenCriteria={() => openSettings("criteria")}
                   />
                 </div>
               </div>
@@ -204,10 +252,17 @@ export default function App() {
                 className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden anim-slide-right">
                 <div className="bg-card rounded-2xl border border-border/50 overflow-hidden flex-1 min-h-0">
                   {selectedStock ? (
-                    <StockDetailPanel stock={selectedStock} onClose={() => setSelectedSymbol(null)} onAddToPortfolio={addHolding} />
+                    <StockDetailPanel stock={selectedStock} onClose={() => setSelectedSymbol("AAPL")} onAddToPortfolio={addHolding} />
+                  ) : activeSymbol ? (
+                    <UniverseStockPanel
+                      symbol={activeSymbol}
+                      cachedMetrics={selectedUniverseMetrics}
+                      onClose={() => setSelectedSymbol("AAPL")}
+                      onAddToPortfolio={addHolding}
+                    />
                   ) : (
                     <div className="flex items-center justify-center h-full text-muted text-xs">
-                      {screenLoading ? "Loading..." : "Select a stock"}
+                      Select a stock
                     </div>
                   )}
                 </div>
