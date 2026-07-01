@@ -19,3 +19,6 @@ data/universe.db
 
 # Editor
 .vscode/
+
+# Frontend env (contains Supabase keys)
+ui/.env.local
