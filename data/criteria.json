@@ -7,14 +7,14 @@
         "description": "Stock is closer to its 52-week low than high (distance to low < 30%)",
         "field": "distance_to_low_pct",
         "operator": "lt",
-        "value": 0.30
+        "value": 0.3
       },
       {
         "id": "positive_revenue_growth",
         "description": "Revenue growth is positive",
         "field": "revenue_growth",
         "operator": "gt",
-        "value": 0.0
+        "value": 0
       },
       {
         "id": "reasonable_forward_pe",
@@ -28,7 +28,7 @@
         "description": "Profit margin is positive",
         "field": "profit_margin",
         "operator": "gt",
-        "value": 0.0
+        "value": 0
       },
       {
         "id": "not_bearish_market",
@@ -48,14 +48,14 @@
         "description": "Stock is within 50% of its 52-week low",
         "field": "distance_to_low_pct",
         "operator": "lt",
-        "value": 0.50
+        "value": 0.5
       },
       {
         "id": "positive_earnings_growth",
         "description": "Earnings growth is positive",
         "field": "earnings_growth",
         "operator": "gt",
-        "value": 0.0
+        "value": 0
       },
       {
         "id": "acceptable_pe",
@@ -69,7 +69,7 @@
         "description": "Operating margin is positive",
         "field": "operating_margin",
         "operator": "gt",
-        "value": 0.0
+        "value": 0
       }
     ],
     "min_rules_met": 3
@@ -82,7 +82,7 @@
         "description": "Stock is within 10% of its 52-week high",
         "field": "distance_to_high_pct",
         "operator": "lt",
-        "value": 0.10
+        "value": 0.1
       },
       {
         "id": "pe_overvalued",
@@ -96,7 +96,7 @@
         "description": "Revenue growth has turned negative",
         "field": "revenue_growth",
         "operator": "lt",
-        "value": 0.0
+        "value": 0
       },
       {
         "id": "bearish_market",
@@ -110,14 +110,26 @@
         "description": "Stock has gained more than 40% from purchase price",
         "field": "gain_pct",
         "operator": "gt",
-        "value": 0.40
+        "value": 0.4
       }
     ],
     "min_rules_met": 2
   },
   "watchlist": [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA",
-    "META", "TSLA", "AMD", "NFLX", "CRM",
-    "ADBE", "INTC", "PYPL", "SQ", "SHOP"
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "NVDA",
+    "META",
+    "TSLA",
+    "AMD",
+    "NFLX",
+    "CRM",
+    "ADBE",
+    "INTC",
+    "PYPL",
+    "SQ",
+    "SHOP"
   ]
 }

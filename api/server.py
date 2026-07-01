@@ -261,6 +261,32 @@ def remove_from_portfolio(symbol: str):
     return {"removed": symbol}
 
 
+# ── Criteria ──────────────────────────────────────────────────────────────
+
+@app.get("/api/criteria")
+def get_criteria():
+    """Return the current criteria config."""
+    from core.criteria import load_criteria
+    c = load_criteria()
+    # Exclude watchlist from the response (UI doesn't need it)
+    return {k: v for k, v in c.items() if k != "watchlist"}
+
+
+@app.put("/api/criteria")
+def update_criteria(body: dict):
+    """Overwrite buy/watch/sell criteria (preserves watchlist)."""
+    import json
+    from pathlib import Path
+    criteria_path = Path(__file__).parent.parent / "data" / "criteria.json"
+    current = json.loads(criteria_path.read_text())
+    # Only update the three mode keys; preserve watchlist
+    for mode in ("buy", "watch", "sell"):
+        if mode in body:
+            current[mode] = body[mode]
+    criteria_path.write_text(json.dumps(current, indent=2))
+    return {"saved": True}
+
+
 # ── Universe ──────────────────────────────────────────────────────────────
 
 @app.get("/api/universe/signals")
@@ -303,6 +329,9 @@ def universe_signals(limit: int = 60):
 
     # Only return buy + watch to keep the panel clean
     return [r for r in results if r["classification"] != "none"]
+
+
+@app.get("/api/universe/status")
 def universe_status():
     """Return background fetch progress and cache stats."""
     from core.universe_fetcher import get_progress
