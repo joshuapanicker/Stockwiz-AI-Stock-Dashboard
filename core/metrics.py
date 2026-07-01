@@ -56,7 +56,7 @@ def get_stock_metrics(symbol: str) -> dict:
     distance_to_low = round((close_price - low_52w) / low_52w, 4) if (close_price and low_52w) else None
     distance_to_high = round((high_52w - close_price) / high_52w, 4) if (high_52w and close_price) else None
 
-    return {
+    result = {
         "symbol": symbol,
         "date": latest_date,
         "close_price": close_price,

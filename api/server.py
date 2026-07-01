@@ -38,10 +38,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 @app.on_event("startup")
 async def prewarm():
-    """Pre-fetch data for top watchlist stocks in background on startup."""
+    """Pre-fetch data for top watchlist stocks and start universe background fetcher."""
     import asyncio
     from core.criteria import get_watchlist
     from core.metrics import get_price_history, get_stock_metrics, get_market_context
+    from core.universe_fetcher import start_background_fetcher
 
     async def warm(symbol: str):
         try:
@@ -56,6 +57,8 @@ async def prewarm():
         get_market_context()
         symbols = get_watchlist()[:8]  # top 8 only
         await asyncio.gather(*[warm(s) for s in symbols])
+        # Start universe background fetcher in a thread
+        start_background_fetcher()
 
     asyncio.create_task(run())
 
@@ -256,6 +259,147 @@ def remove_from_portfolio(symbol: str):
     if not remove_holding(symbol):
         raise HTTPException(status_code=404, detail=f"{symbol} not found")
     return {"removed": symbol}
+
+
+# ── Universe ──────────────────────────────────────────────────────────────
+
+@app.get("/api/universe/signals")
+def universe_signals(limit: int = 60):
+    """
+    Evaluate buy/watch criteria against the top cached universe stocks.
+    Returns classified results sorted buy → watch → none, limited to top candidates.
+    """
+    from core.universe_cache import query_universe
+    from core.criteria import evaluate_criteria
+    from core.metrics import get_market_context
+
+    # Pull top stocks by market cap from the cache
+    stocks = query_universe(order_by="market_cap DESC", limit=limit)
+    market = get_market_context()
+
+    results = []
+    for s in stocks:
+        buy_result = evaluate_criteria("buy", s, market)
+        watch_result = evaluate_criteria("watch", s, market)
+
+        if buy_result["passed"]:
+            classification = "buy"
+        elif watch_result["passed"]:
+            classification = "watch"
+        else:
+            classification = "none"
+
+        results.append({
+            "symbol": s["symbol"],
+            "classification": classification,
+            "metrics": s,
+            "buy_result": buy_result,
+            "watch_result": watch_result,
+        })
+
+    # Sort: buy first, then watch, then none
+    order = {"buy": 0, "watch": 1, "none": 2}
+    results.sort(key=lambda x: (order[x["classification"]], -(x["metrics"].get("market_cap") or 0)))
+
+    # Only return buy + watch to keep the panel clean
+    return [r for r in results if r["classification"] != "none"]
+def universe_status():
+    """Return background fetch progress and cache stats."""
+    from core.universe_fetcher import get_progress
+    from core.universe_cache import get_cached_count, get_total_universe_size
+    progress = get_progress()
+    return {
+        "cached": get_cached_count(),
+        "total": get_total_universe_size(),
+        "fetching": progress["running"],
+        "fetched_this_cycle": progress["fetched"],
+        "cycle_total": progress["total"],
+        "last_run": progress["last_run"],
+    }
+
+
+@app.get("/api/universe/sectors")
+def universe_sectors():
+    """Return distinct sectors available in the cached universe."""
+    from core.universe_cache import get_sectors
+    return get_sectors()
+
+
+class UniverseQueryRequest(BaseModel):
+    sector: str | None = None
+    max_forward_pe: float | None = None
+    max_trailing_pe: float | None = None
+    min_revenue_growth: float | None = None
+    min_profit_margin: float | None = None
+    min_earnings_growth: float | None = None
+    near_52w_low_pct: float | None = None
+    min_market_cap: float | None = None
+    limit: int = 50
+    order_by: str = "market_cap DESC"
+
+
+@app.post("/api/universe/query")
+def universe_query(req: UniverseQueryRequest):
+    """Structured query against the cached universe."""
+    from core.universe_cache import query_universe
+    results = query_universe(
+        sector=req.sector,
+        max_forward_pe=req.max_forward_pe,
+        max_trailing_pe=req.max_trailing_pe,
+        min_revenue_growth=req.min_revenue_growth,
+        min_profit_margin=req.min_profit_margin,
+        near_52w_low_pct=req.near_52w_low_pct,
+        min_earnings_growth=req.min_earnings_growth,
+        min_market_cap=req.min_market_cap,
+        limit=min(req.limit, 100),
+        order_by=req.order_by,
+    )
+    return results
+
+
+class AgentFilterRequest(BaseModel):
+    query: str
+    messages: list[ChatMessage] = []
+
+
+@app.post("/api/universe/agent")
+async def universe_agent(req: AgentFilterRequest):
+    """
+    Natural language → structured filter → ranked results + streamed AI summary.
+    Returns SSE stream. First event contains the structured filter + raw results,
+    then tokens stream for the summary.
+    """
+    from core.universe_agent import run_agent_filter, build_summary_system
+    from core.metrics import get_market_context
+
+    try:
+        filters, results = run_agent_filter(req.query)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    market = get_market_context()
+
+    # First SSE event: structured payload (filters + results list)
+    import json as _json
+    first_event = _json.dumps({
+        "type": "results",
+        "filters": filters,
+        "results": sanitize(results[:50]),
+        "total_matched": len(results),
+    })
+
+    def generate():
+        yield f"data: {first_event}\n\n"
+        # Stream the AI summary
+        system = build_summary_system(filters, results, market)
+        messages = [{"role": "user", "content": req.query}]
+        yield from _stream_anthropic(system, messages, max_tokens=300)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 if __name__ == "__main__":

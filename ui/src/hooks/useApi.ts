@@ -126,4 +126,45 @@ export function useMarket() {
   return data;
 }
 
+export function useUniverseSignals() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    apiFetch<any[]>("/universe/signals?limit=60")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return { data, loading, refresh };
+}
+
+export function useUniverseStatus() {  const [data, setData] = useState<any | null>(null);
+
+  const refresh = useCallback(() => {
+    apiFetch<any>("/universe/status").then(setData).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  return data;
+}
+
+export function useUniverseSectors() {
+  const [data, setData] = useState<string[]>([]);
+
+  useEffect(() => {
+    apiFetch<string[]>("/universe/sectors").then(setData).catch(() => {});
+  }, []);
+
+  return data;
+}
+
 export { apiFetch };
