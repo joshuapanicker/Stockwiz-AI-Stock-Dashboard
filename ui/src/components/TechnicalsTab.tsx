@@ -5,6 +5,8 @@
 import clsx from "clsx";
 import RSIChart from "./RSIChart";
 import MovingAverageChart from "./MovingAverageChart";
+import MACDChart from "./MACDChart";
+import BollingerChart from "./BollingerChart";
 
 interface Props {
   history: any[];  // OHLCV bars
@@ -110,10 +112,26 @@ export default function TechnicalsTab({ history, symbol, currentPrice }: Props) 
         </div>
       )}
 
+      {/* MACD chart */}
+      {history.length > 27 && (
+        <div>
+          <p className="text-xs text-muted mb-2">MACD</p>
+          <MACDChart history={history} height={110} />
+        </div>
+      )}
+
+      {/* Bollinger Bands */}
+      {history.length > 20 && (
+        <div>
+          <p className="text-xs text-muted mb-2">Bollinger Bands (20, 2σ)</p>
+          <BollingerChart history={history} height={130} />
+        </div>
+      )}
+
       {/* MA chart */}
       {history.length > 20 && (
         <div>
-          <p className="text-xs text-muted mb-2">Price + Moving Averages</p>
+          <p className="text-xs text-muted mb-2">Moving Averages (20 / 50 / 200)</p>
           <MovingAverageChart history={history} height={130} />
         </div>
       )}

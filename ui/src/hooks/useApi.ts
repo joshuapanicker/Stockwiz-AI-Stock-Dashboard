@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabase";
 
 // In production, API calls go to the deployed backend URL.
 // In development, Vite proxies /api to localhost:8000.
@@ -90,11 +91,26 @@ export function usePortfolio() {
   }, [load]);
 
   const addHolding = useCallback(async (symbol: string, buy_date: string, buy_price?: number, notes?: string) => {
-    await apiFetch("/portfolio", {
-      method: "POST",
-      body: JSON.stringify({ symbol, buy_date, buy_price, notes }),
-    });
-    await load();
+    // Retry once if we get 401 — token may still be initializing
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await apiFetch("/portfolio", {
+          method: "POST",
+          body: JSON.stringify({ symbol, buy_date, buy_price, notes }),
+        });
+        await load();
+        return;
+      } catch (e: any) {
+        if (attempt === 0 && e.message?.includes("401")) {
+          // Token wasn't ready — wait 600ms and get a fresh one
+          await new Promise(r => setTimeout(r, 600));
+          const { data } = await supabase.auth.getSession();
+          setAuthToken(data.session?.access_token ?? null);
+        } else {
+          throw e;
+        }
+      }
+    }
   }, [load]);
 
   const removeHolding = useCallback(async (symbol: string) => {
