@@ -12,6 +12,8 @@ import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
 import StockChat from "./StockChat";
 import NewsPanel from "./NewsPanel";
+import FinancialsTab from "./FinancialsTab";
+import TechnicalsTab from "./TechnicalsTab";
 import { usePriceHistory, useAnalysis, apiFetch } from "../hooks/useApi";
 import type { UniverseStock } from "../types";
 
@@ -23,7 +25,7 @@ interface Props {
 }
 
 type ChartMode = "candle" | "area";
-type RightTab = "analysis" | "chat" | "news";
+type RightTab = "analysis" | "chat" | "news" | "financials" | "technicals";
 
 export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onAddToPortfolio }: Props) {
   const [chartMode, setChartMode] = useState<ChartMode>("candle");
@@ -138,11 +140,11 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
       {/* Tab switcher */}
       <div className="px-4 pt-3 flex-shrink-0">
         <div className="flex gap-1 bg-card2 rounded-lg p-0.5">
-          {(["analysis", "news", "chat"] as RightTab[]).map(t => (
+          {(["analysis", "news", "financials", "technicals", "chat"] as RightTab[]).map(t => (
             <button key={t} onClick={() => setRightTab(t)}
               className={clsx("flex-1 py-1.5 rounded-md text-xs font-medium transition-colors",
                 rightTab === t ? "bg-white/10 text-white" : "text-muted hover:text-white")}>
-              {t === "analysis" ? "AI Analysis" : t === "news" ? "News" : "Chat"}
+              {t === "analysis" ? "AI" : t === "news" ? "News" : t === "financials" ? "Financials" : t === "technicals" ? "Technical" : "Chat"}
             </button>
           ))}
         </div>
@@ -152,6 +154,14 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
       {rightTab === "news" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0">
           <NewsPanel symbol={symbol} />
+        </div>
+      ) : rightTab === "financials" ? (
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
+          <FinancialsTab symbol={symbol} />
+        </div>
+      ) : rightTab === "technicals" ? (
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
+          <TechnicalsTab history={history} symbol={symbol} currentPrice={m?.close_price} />
         </div>
       ) : rightTab === "analysis" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0 space-y-3">
