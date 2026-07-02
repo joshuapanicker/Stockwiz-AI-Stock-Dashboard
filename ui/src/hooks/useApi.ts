@@ -73,8 +73,14 @@ export function usePriceHistory(symbol: string | null, period = "1y") {
 export function usePortfolio() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // Ensure we have a fresh token before loading
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.access_token) {
+      setAuthToken(sessionData.session.access_token);
+    }
     setLoading(true);
     try {
       const result = await apiFetch<any[]>("/portfolio");
@@ -91,25 +97,21 @@ export function usePortfolio() {
   }, [load]);
 
   const addHolding = useCallback(async (symbol: string, buy_date: string, buy_price?: number, shares?: number, notes?: string) => {
-    // Retry once if we get 401 — token may still be initializing
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        await apiFetch("/portfolio", {
-          method: "POST",
-          body: JSON.stringify({ symbol, buy_date, buy_price, shares: shares ?? 1, notes }),
-        });
-        await load();
-        return;
-      } catch (e: any) {
-        if (attempt === 0 && e.message?.includes("401")) {
-          // Token wasn't ready — wait 600ms and get a fresh one
-          await new Promise(r => setTimeout(r, 600));
-          const { data } = await supabase.auth.getSession();
-          setAuthToken(data.session?.access_token ?? null);
-        } else {
-          throw e;
-        }
-      }
+    setAddError(null);
+    // Always refresh token before a mutating call
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.access_token) {
+      setAuthToken(sessionData.session.access_token);
+    }
+    try {
+      await apiFetch("/portfolio", {
+        method: "POST",
+        body: JSON.stringify({ symbol, buy_date, buy_price, shares: shares ?? 1, notes }),
+      });
+      await load();
+    } catch (e: any) {
+      setAddError(e.message ?? "Failed to add holding");
+      throw e;
     }
   }, [load]);
 
@@ -118,7 +120,7 @@ export function usePortfolio() {
     await load();
   }, [load]);
 
-  return { data, loading, refresh: load, addHolding, removeHolding };
+  return { data, loading, refresh: load, addHolding, removeHolding, addError };
 }
 
 export function useAnalysis(symbol: string | null, action: string | null) {
