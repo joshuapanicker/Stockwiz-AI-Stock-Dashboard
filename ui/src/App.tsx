@@ -6,6 +6,7 @@ import CandlestickChart from "./components/CandlestickChart";
 import AreaChart from "./components/AreaChart";
 import ROIChart from "./components/ROIChart";
 import VolumeProfileChart from "./components/VolumeProfileChart";
+import ChartWidget from "./components/ChartWidget";
 import UniverseTable from "./components/UniverseTable";
 import StockDetailPanel from "./components/StockDetailPanel";
 import UniverseStockPanel from "./components/UniverseStockPanel";
@@ -186,45 +187,57 @@ export default function App() {
                 {/* Charts row 1 */}
                 <div className="grid grid-cols-2 gap-2 flex-shrink-0 min-w-0 stagger">
                   <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-medium text-white/80 bg-card2 px-3 py-1 rounded-lg">Stock Search Engine</span>
-                      <div className="flex items-center gap-2">
-                        {activeSymbol && <span className="text-xs text-muted font-mono truncate max-w-[80px]">{activeSymbol}</span>}
-                      </div>
-                    </div>
-                    {featuredHistory.length > 0
-                      ? <CandlestickChart data={featuredHistory} height={190} />
-                      : <div className={screenLoading ? "chart-skeleton h-[190px]" : "flex items-center justify-center h-[190px] text-muted text-xs"}>{!screenLoading && "Select a stock"}</div>}
+                    <ChartWidget
+                      slotKey="slot1"
+                      defaultType="candlestick"
+                      history={featuredHistory}
+                      history6m={featuredHistory6m}
+                      symbol={activeSymbol}
+                      currentPrice={selectedStock?.metrics?.close_price ?? null}
+                      height={190}
+                      label={activeSymbol ?? "—"}
+                      loadingSkeleton={screenLoading && !featuredHistory.length}
+                    />
                   </div>
-
                   <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-mono text-white/80 truncate">{activeSymbol ?? "—"}</span>
-                      <span className="text-xs text-muted flex-shrink-0">6mo area</span>
-                    </div>
-                    {featuredAreaData.length > 0
-                      ? <AreaChart data={featuredAreaData} height={190} color="#00e676" />
-                      : <div className={screenLoading ? "chart-skeleton h-[190px]" : "flex items-center justify-center h-[190px] text-muted text-xs"}>{!screenLoading && "Select a stock"}</div>}
+                    <ChartWidget
+                      slotKey="slot2"
+                      defaultType="area"
+                      history={featuredHistory}
+                      history6m={featuredHistory6m}
+                      symbol={activeSymbol}
+                      currentPrice={selectedStock?.metrics?.close_price ?? null}
+                      height={190}
+                      label={activeSymbol ?? "—"}
+                      loadingSkeleton={screenLoading && !featuredHistory.length}
+                    />
                   </div>
                 </div>
 
                 {/* Charts row 2 */}
                 <div className="grid grid-cols-2 gap-2 flex-shrink-0 min-w-0 stagger">
                   <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
-                    <p className="text-xs font-semibold text-white mb-2">ROI (6 Month)</p>
-                    {roiData.length > 0
-                      ? <ROIChart data={roiData} height={150} />
-                      : <div className={screenLoading ? "chart-skeleton h-[150px]" : "flex items-center justify-center h-[150px] text-muted text-xs"}>{!screenLoading && "Select a stock"}</div>}
-                  </div>
-                  <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-white">Volume Profile</p>
-                      <span className="text-xs text-muted font-mono truncate max-w-[60px]">{activeSymbol ?? "—"}</span>
-                    </div>
-                    <VolumeProfileChart
+                    <ChartWidget
+                      slotKey="slot3"
+                      defaultType="roi"
                       history={featuredHistory}
+                      history6m={featuredHistory6m}
+                      symbol={activeSymbol}
                       currentPrice={selectedStock?.metrics?.close_price ?? null}
                       height={150}
+                      loadingSkeleton={screenLoading && !featuredHistory6m.length}
+                    />
+                  </div>
+                  <div className="bg-card rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up">
+                    <ChartWidget
+                      slotKey="slot4"
+                      defaultType="volume_profile"
+                      history={featuredHistory}
+                      history6m={featuredHistory6m}
+                      symbol={activeSymbol}
+                      currentPrice={selectedStock?.metrics?.close_price ?? null}
+                      height={150}
+                      loadingSkeleton={screenLoading && !featuredHistory.length}
                     />
                   </div>
                 </div>

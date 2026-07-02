@@ -300,6 +300,59 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
     return {"removed": symbol}
 
 
+# ── Financials ────────────────────────────────────────────────────────────
+
+@app.get("/api/financials/{symbol}")
+def financials(symbol: str):
+    """Return quarterly revenue and net income for charting."""
+    from core.cache import get as cache_get, set as cache_set
+    import math
+    key = f"financials:{symbol.upper()}"
+    cached = cache_get(key, 3600)  # cache 1hr
+    if cached:
+        return cached
+    try:
+        import yfinance as yf
+        t = yf.Ticker(symbol.strip().upper())
+        fin = t.quarterly_financials
+        if fin is None or fin.empty:
+            return {"quarters": [], "revenue_growth_yoy": None, "profit_margin": None}
+
+        def safe_val(v):
+            try:
+                f = float(v)
+                return None if (math.isnan(f) or math.isinf(f)) else round(f, 0)
+            except Exception:
+                return None
+
+        quarters = []
+        cols = list(fin.columns[:8])  # last 8 quarters max
+        for col in reversed(cols):
+            q_label = col.strftime("%Y Q%q") if hasattr(col, 'strftime') else str(col)[:7]
+            rev = safe_val(fin.loc["Total Revenue", col]) if "Total Revenue" in fin.index else None
+            ni  = safe_val(fin.loc["Net Income", col])    if "Net Income"    in fin.index else None
+            quarters.append({"quarter": q_label, "revenue": rev, "net_income": ni})
+
+        # YoY revenue growth (latest vs 4 quarters ago)
+        rev_growth = None
+        rev_vals = [q["revenue"] for q in quarters if q["revenue"] is not None]
+        if len(rev_vals) >= 5:
+            latest, year_ago = rev_vals[-1], rev_vals[-5]
+            if year_ago and year_ago != 0:
+                rev_growth = round((latest - year_ago) / abs(year_ago), 4)
+
+        metrics = get_stock_metrics(symbol)
+        result = {
+            "quarters": quarters,
+            "revenue_growth_yoy": rev_growth,
+            "profit_margin": metrics.get("profit_margin"),
+        }
+        cache_set(key, result)
+        return result
+    except Exception as e:
+        return {"quarters": [], "revenue_growth_yoy": None, "profit_margin": None}
+
+
 # ── Alerts ────────────────────────────────────────────────────────────────
 
 @app.get("/api/alerts")

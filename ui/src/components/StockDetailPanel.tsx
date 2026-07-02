@@ -6,6 +6,8 @@ import AreaChart from "./AreaChart";
 import DepthChart from "./DepthChart";
 import StockChat from "./StockChat";
 import NewsPanel from "./NewsPanel";
+import FinancialsTab from "./FinancialsTab";
+import TechnicalsTab from "./TechnicalsTab";
 import { usePriceHistory, useAnalysis } from "../hooks/useApi";
 import type { ScreenedStock } from "../types";
 import { generateDepthData } from "../utils/mockDepth";
@@ -17,7 +19,7 @@ interface Props {
 }
 
 type ChartMode = "candle" | "area";
-type RightTab = "analysis" | "chat" | "news";
+type RightTab = "analysis" | "chat" | "news" | "financials" | "technicals";
 
 export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: Props) {
   const [chartMode, setChartMode] = useState<ChartMode>("candle");
@@ -151,7 +153,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
       {/* Tab switcher */}
       <div className="px-4 pt-3 flex-shrink-0">
         <div className="flex gap-1 bg-card2 rounded-lg p-0.5">
-          {(["analysis", "news", "chat"] as RightTab[]).map((tab) => (
+          {(["analysis", "news", "financials", "technicals", "chat"] as RightTab[]).map((tab) => (
             <button key={tab} onClick={(e) => {
                 e.preventDefault();
                 const container = (e.currentTarget as HTMLElement).closest(".overflow-y-auto");
@@ -161,7 +163,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
               }}
               className={clsx("flex-1 py-1.5 rounded-md text-xs font-medium transition-colors",
                 rightTab === tab ? "bg-white/10 text-white" : "text-muted hover:text-white")}>
-              {tab === "analysis" ? "AI Analysis" : tab === "news" ? "News" : "Chat"}
+              {tab === "analysis" ? "AI" : tab === "news" ? "News" : tab === "financials" ? "Financials" : tab === "technicals" ? "Technical" : "Chat"}
             </button>
           ))}
         </div>
@@ -171,6 +173,14 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
       {rightTab === "news" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0">
           <NewsPanel symbol={stock.symbol} />
+        </div>
+      ) : rightTab === "financials" ? (
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
+          <FinancialsTab symbol={stock.symbol} />
+        </div>
+      ) : rightTab === "technicals" ? (
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
+          <TechnicalsTab history={history} symbol={stock.symbol} currentPrice={m.close_price} />
         </div>
       ) : rightTab === "analysis" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0 space-y-3">
