@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "../lib/supabase";
+import { setAuthToken } from "../hooks/useApi";
 import type { User, Session } from "../lib/supabase";
 
 interface AuthContextValue {
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
+      setAuthToken(data.session?.access_token ?? null);
       setLoading(false);
     });
 
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
+      setAuthToken(session?.access_token ?? null);
       setLoading(false);
     });
 

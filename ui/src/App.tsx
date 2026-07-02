@@ -85,9 +85,9 @@ export default function App() {
   const [rightWidth, setRightWidth] = useState(340);
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"criteria" | "notifications" | "security">("criteria");
+  const [settingsTab, setSettingsTab] = useState<"profile" | "criteria" | "notifications" | "security">("criteria");
 
-  function openSettings(tab: "criteria" | "notifications" | "security" = "criteria") {
+  function openSettings(tab: "profile" | "criteria" | "notifications" | "security" = "criteria") {
     setSettingsTab(tab);
     setSettingsOpen(true);
   }
