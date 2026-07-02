@@ -303,17 +303,18 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
 # ── Criteria ──────────────────────────────────────────────────────────────
 
 @app.get("/api/criteria")
-def get_criteria(user_id: str = Depends(get_current_user)):
+def get_criteria(user_id: str | None = Depends(get_optional_user)):
     from core.criteria import load_criteria
     c = load_criteria(user_id)
     return {k: v for k, v in c.items() if k != "watchlist"}
 
 
 @app.put("/api/criteria")
-def update_criteria(body: dict, user_id: str = Depends(get_current_user)):
+def update_criteria(body: dict, user_id: str | None = Depends(get_optional_user)):
     from core.db import save_user_criteria
     from core.criteria import _load_defaults
-    import json
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Must be logged in to save criteria")
     defaults = _load_defaults()
     current = {k: v for k, v in defaults.items() if k != "watchlist"}
     for mode in ("buy", "watch", "sell"):
@@ -326,14 +327,19 @@ def update_criteria(body: dict, user_id: str = Depends(get_current_user)):
 # ── User Profile ──────────────────────────────────────────────────────────
 
 @app.get("/api/profile")
-def get_profile(user_id: str = Depends(get_current_user)):
+def get_profile(user_id: str | None = Depends(get_optional_user)):
     from core.db import get_user_profile
+    from core.db import DEFAULT_PROFILE
+    if not user_id:
+        return dict(DEFAULT_PROFILE)
     return get_user_profile(user_id)
 
 
 @app.put("/api/profile")
-def update_profile(body: dict, user_id: str = Depends(get_current_user)):
+def update_profile(body: dict, user_id: str | None = Depends(get_optional_user)):
     from core.db import save_user_profile
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Must be logged in to save profile")
     return save_user_profile(user_id, body)
 
 
