@@ -6,7 +6,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import clsx from "clsx";
 import { Send, Bot, RefreshCw, X, SlidersHorizontal, Sparkles, Database, User, ChevronDown, ChevronUp, Settings } from "lucide-react";
-import { apiFetch, useUniverseStatus, useUniverseSectors } from "../hooks/useApi";
+import { apiFetch, useUniverseStatus, useUniverseSectors, API_BASE } from "../hooks/useApi";
 import type { UniverseStock, UniverseFilters } from "../types";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -335,7 +335,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
     }
 
     try {
-      const res = await fetch("/api/universe/agent", {
+      const res = await fetch(`${API_BASE}/universe/agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q }),

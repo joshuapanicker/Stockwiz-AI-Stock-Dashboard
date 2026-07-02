@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, User, Plus, MessageSquare, Trash2, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { apiFetch } from "../hooks/useApi";
+import { apiFetch, API_BASE } from "../hooks/useApi";
 import TypewriterMessage from "./TypewriterMessage";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -104,7 +104,7 @@ export default function GeneralChat() {
     abortRef.current = new AbortController();
     let full = "";
     try {
-      await streamChat("/api/chat/general", next, (token) => {
+      await streamChat(`${API_BASE}/chat/general`, next, (token) => {
         full += token;
         setMessages(prev => {
           const u = [...prev];

@@ -6,6 +6,8 @@ const BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : "/api";
 
+export const API_BASE = BASE;
+
 // Token is set by AuthContext via setAuthToken() when session is established
 let _cachedToken: string | null = null;
 
