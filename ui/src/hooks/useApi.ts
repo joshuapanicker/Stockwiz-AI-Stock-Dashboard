@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const BASE = "/api";
+// In production, API calls go to the deployed backend URL.
+// In development, Vite proxies /api to localhost:8000.
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : "/api";
 
 // Token is set by AuthContext via setAuthToken() when session is established
 let _cachedToken: string | null = null;
