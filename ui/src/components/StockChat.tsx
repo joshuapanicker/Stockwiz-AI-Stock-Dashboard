@@ -3,7 +3,7 @@ import { Send, Bot, User } from "lucide-react";
 import clsx from "clsx";
 import PredictionChart from "./PredictionChart";
 import TypewriterMessage from "./TypewriterMessage";
-import { apiFetch } from "../hooks/useApi";
+import { apiFetch, API_BASE } from "../hooks/useApi";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,7 +24,7 @@ interface Props {
 }
 
 async function streamChat(symbol: string, messages: Message[], onToken: (t: string) => void, signal: AbortSignal) {
-  const res = await fetch(`/api/chat/${symbol}`, {
+  const res = await fetch(`${API_BASE}/chat/${symbol}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
