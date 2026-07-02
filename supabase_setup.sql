@@ -49,3 +49,6 @@ create policy "users can manage own profile"
   on user_profiles for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Add shares column to portfolios (run if table already exists)
+alter table portfolios add column if not exists shares numeric default 1;

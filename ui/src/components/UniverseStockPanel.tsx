@@ -21,7 +21,7 @@ interface Props {
   symbol: string;
   cachedMetrics?: UniverseStock | null;   // from universe cache — shows instantly
   onClose: () => void;
-  onAddToPortfolio: (symbol: string, buyDate: string, buyPrice?: number) => void;
+  onAddToPortfolio: (symbol: string, buyDate: string, buyPrice?: number, shares?: number) => void;
 }
 
 type ChartMode = "candle" | "area";
@@ -34,6 +34,7 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
   const [showAddForm, setShowAddForm] = useState(false);
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
   const [buyPrice, setBuyPrice] = useState("");
+  const [shares, setShares] = useState("1");
 
   const { data: history, loading: histLoading } = usePriceHistory(symbol, period);
   const { data: analysis, loading: analysisLoading, error: analysisError } = useAnalysis(symbol, "buy");
@@ -42,7 +43,7 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
   const m = cachedMetrics;
 
   function handleAdd() {
-    onAddToPortfolio(symbol, buyDate, buyPrice ? parseFloat(buyPrice) : undefined);
+    onAddToPortfolio(symbol, buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1);
     setShowAddForm(false);
   }
 
@@ -193,6 +194,12 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
                 <div className="flex-1">
                   <label className="text-[10px] text-muted">Buy Date</label>
                   <input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)}
+                    className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-white mt-0.5 focus:outline-none focus:border-green/50" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted">Shares</label>
+                  <input type="number" min="0.001" step="any" placeholder="1" value={shares}
+                    onChange={e => setShares(e.target.value)}
                     className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-white mt-0.5 focus:outline-none focus:border-green/50" />
                 </div>
                 <div className="flex-1">

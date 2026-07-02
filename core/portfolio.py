@@ -83,11 +83,14 @@ def _lookup_price_on_date(symbol: str, date_str: str) -> float | None:
 
 def compute_gain(holding: dict, current_price: float) -> dict:
     buy_price = holding.get("buy_price")
+    shares = float(holding.get("shares") or 1)
     if buy_price is None or buy_price == 0:
-        return {"gain_pct": None, "gain_abs": None}
-    gain_abs = round(current_price - buy_price, 4)
-    gain_pct = round((current_price - buy_price) / buy_price, 4)
-    return {"gain_pct": gain_pct, "gain_abs": gain_abs}
+        return {"gain_pct": None, "gain_abs": None, "total_value": None}
+    gain_per_share = current_price - buy_price
+    gain_abs = round(gain_per_share * shares, 4)
+    gain_pct = round(gain_per_share / buy_price, 4)
+    total_value = round(current_price * shares, 4)
+    return {"gain_pct": gain_pct, "gain_abs": gain_abs, "total_value": total_value}
 
 
 def get_portfolio_price_history(symbol: str, buy_date: str) -> list[dict]:
