@@ -288,21 +288,22 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
         )}
       </div>
 
-      {holdings.length === 0 ? (
-        <div className="relative z-10 flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-border/50 flex items-center justify-center">
-            <Package size={24} className="text-muted" />
-          </div>
-          <p className="text-white font-semibold">No positions yet</p>
-          <p className="text-muted text-sm">Add stocks you've purchased to start tracking</p>
-        </div>
-      ) : (
-        /* ── Two-column split ── */
-        <div className="relative z-10 flex min-h-0 flex-1 gap-0 px-4 pb-6">
+      {/* ── Two-column split — always shown ── */}
+      <div className="relative z-10 flex min-h-0 flex-1 gap-0 px-4 pb-6">
 
-          {/* ── LEFT: charts + stats + holdings ── */}
-          <div className="flex-1 min-w-0 overflow-y-auto pr-3 space-y-5">
+        {/* ── LEFT: charts + stats + holdings ── */}
+        <div className="flex-1 min-w-0 overflow-y-auto pr-3 space-y-5">
 
+          {holdings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-border/50 flex items-center justify-center">
+                <Package size={24} className="text-muted" />
+              </div>
+              <p className="text-white font-semibold">No positions yet</p>
+              <p className="text-muted text-sm">Add stocks you've purchased to start tracking</p>
+            </div>
+          ) : (
+            <>
             {/* Charts row */}
             <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
               <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5">
@@ -404,7 +405,9 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                 )}
               </div>
             </div>
-          </div>
+            </>
+          )}
+        </div>{/* end left column */}
 
           {/* ── Vertical divider ── */}
           <div className="w-px bg-border/50 flex-shrink-0 mx-1" />
@@ -485,9 +488,8 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                 )}
               </>
             )}
-          </div>
-        </div>
-      )}
+          </div>{/* end right column */}
+        </div>{/* end two-column */}
     </div>
   );
 }
