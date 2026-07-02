@@ -14,6 +14,8 @@ import VolumeProfileChart from "./VolumeProfileChart";
 import MovingAverageChart from "./MovingAverageChart";
 import RSIChart from "./RSIChart";
 import RelativeStrengthChart from "./RelativeStrengthChart";
+import MACDChart from "./MACDChart";
+import BollingerChart from "./BollingerChart";
 
 export type ChartType =
   | "candlestick"
@@ -22,15 +24,19 @@ export type ChartType =
   | "volume_profile"
   | "moving_averages"
   | "rsi"
-  | "relative_strength";
+  | "relative_strength"
+  | "macd"
+  | "bollinger";
 
 export const CHART_OPTIONS: { value: ChartType; label: string; desc: string }[] = [
   { value: "candlestick",       label: "Candlestick",       desc: "OHLC price action" },
   { value: "area",              label: "Area",              desc: "Smoothed price line" },
-  { value: "roi",               label: "ROI %",             desc: "Return from period start" },
-  { value: "volume_profile",    label: "Volume Profile",    desc: "Volume by price level" },
+  { value: "bollinger",         label: "Bollinger Bands",   desc: "Price + volatility bands" },
   { value: "moving_averages",   label: "Moving Averages",   desc: "20 / 50 / 200 DMA" },
+  { value: "macd",              label: "MACD",              desc: "Momentum + signal line" },
   { value: "rsi",               label: "RSI (14)",          desc: "Overbought / oversold" },
+  { value: "volume_profile",    label: "Volume Profile",    desc: "Volume by price level" },
+  { value: "roi",               label: "ROI %",             desc: "Return from period start" },
   { value: "relative_strength", label: "vs SPY",            desc: "Relative performance" },
 ];
 
@@ -68,6 +74,8 @@ export function ChartRenderer({ type, history, history6m, symbol, currentPrice, 
     case "moving_averages":   return <MovingAverageChart history={h1y} height={height} />;
     case "rsi":               return <RSIChart history={h1y} height={height} />;
     case "relative_strength": return <RelativeStrengthChart history={h1y} symbol={symbol} height={height} />;
+    case "macd":              return <MACDChart history={h1y} height={height} />;
+    case "bollinger":         return <BollingerChart history={h1y} height={height} />;
     default:                  return null;
   }
 }
@@ -138,7 +146,7 @@ export default function ChartWidget({
 
         {/* Dropdown */}
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 w-52 bg-card2 border border-border/70 rounded-xl shadow-2xl z-30 py-1 anim-scale-in">
+          <div className="absolute right-0 top-full mt-1 w-52 bg-card2 border border-border/70 rounded-xl shadow-2xl z-30 py-1 anim-scale-in max-h-64 overflow-y-auto">
             {CHART_OPTIONS.map(opt => (
               <button key={opt.value} onClick={() => selectType(opt.value)}
                 className={clsx(

@@ -284,6 +284,7 @@ def add_to_portfolio(req: AddHoldingRequest, user_id: str | None = Depends(get_o
         buy_price = _lookup_price_on_date(req.symbol, req.buy_date)
     if user_id:
         return upsert_holding(user_id, req.symbol, req.buy_date, buy_price, req.notes)
+    # Fallback: write to local file (dev only — no auth)
     return file_add_holding(req.symbol, req.buy_date, buy_price, req.notes)
 
 
