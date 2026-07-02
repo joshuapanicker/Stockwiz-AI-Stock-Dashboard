@@ -8,7 +8,25 @@ from pathlib import Path
 CRITERIA_FILE = Path(__file__).parent.parent / "data" / "criteria.json"
 
 
-def load_criteria() -> dict:
+def load_criteria(user_id: str | None = None) -> dict:
+    """
+    Load criteria for a user. If user_id is provided and they have custom
+    criteria in Supabase, return those. Otherwise fall back to defaults.
+    """
+    if user_id:
+        try:
+            from core.db import get_user_criteria
+            custom = get_user_criteria(user_id)
+            if custom:
+                # Merge with defaults so watchlist is always present
+                defaults = _load_defaults()
+                return {**defaults, **custom}
+        except Exception:
+            pass
+    return _load_defaults()
+
+
+def _load_defaults() -> dict:
     with open(CRITERIA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -38,7 +56,9 @@ def _evaluate_rule(rule: dict, data: dict) -> bool:
     return False
 
 
-def evaluate_criteria(mode: str, metrics: dict, market: dict, gain_pct: float | None = None) -> dict:
+def evaluate_criteria(mode: str, metrics: dict, market: dict,
+                      gain_pct: float | None = None,
+                      user_id: str | None = None) -> dict:
     """
     Evaluate buy/watch/sell criteria against the provided data.
 
@@ -51,7 +71,7 @@ def evaluate_criteria(mode: str, metrics: dict, market: dict, gain_pct: float | 
             "details": [{"id", "description", "passed"}, ...]
         }
     """
-    criteria = load_criteria()
+    criteria = load_criteria(user_id)
     config = criteria.get(mode, {})
     rules = config.get("rules", [])
     min_required = config.get("min_rules_met", len(rules))
@@ -81,5 +101,5 @@ def evaluate_criteria(mode: str, metrics: dict, market: dict, gain_pct: float | 
     }
 
 
-def get_watchlist() -> list[str]:
-    return load_criteria().get("watchlist", [])
+def get_watchlist(user_id: str | None = None) -> list[str]:
+    return load_criteria(user_id).get("watchlist", [])

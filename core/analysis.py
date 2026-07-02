@@ -7,9 +7,11 @@ import anthropic
 
 from core.criteria import evaluate_criteria
 from core.metrics import get_market_context, get_stock_metrics
+from core.news import build_news_context
 
 
-def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict, market: dict) -> str:
+def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict,
+                  market: dict, news_ctx: str = "") -> str:
     data = {k: metrics.get(k) for k in [
         "symbol", "date", "close_price", "low_52_week", "high_52_week",
         "trailing_pe", "forward_pe", "revenue_growth", "earnings_growth",
@@ -23,12 +25,16 @@ def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict
         for r in criteria_result.get("details", [])
     )
 
+    news_section = news_ctx if news_ctx else "(no recent news available)"
+
     return f"""Analyze stock {symbol} for action: {action.upper()}.
 
 Criteria ({criteria_result.get('rules_met')}/{criteria_result.get('rules_total')} met, need {criteria_result.get('min_required')}):
 {rules}
 
-Data: {json.dumps(data, separators=(',', ':'))}
+Fundamentals: {json.dumps(data, separators=(',', ':'))}
+
+{news_section}
 
 Return exactly:
 
@@ -56,12 +62,13 @@ async def analyze_stock(symbol: str, action: str, gain_pct: float | None = None)
     metrics = get_stock_metrics(symbol)
     market = get_market_context()
     criteria_result = evaluate_criteria(action, metrics, market, gain_pct=gain_pct)
+    news_ctx = build_news_context(symbol)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set.")
 
-    prompt = _build_prompt(symbol, action, criteria_result, metrics, market)
+    prompt = _build_prompt(symbol, action, criteria_result, metrics, market, news_ctx)
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",

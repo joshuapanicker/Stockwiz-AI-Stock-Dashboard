@@ -5,6 +5,7 @@ import os
 import re
 import anthropic
 from core.metrics import get_market_context, get_stock_metrics
+from core.news import get_recent_news, get_recent_earnings
 
 
 # Common tickers to detect in messages
@@ -52,7 +53,7 @@ def _fmt(val, decimals=2, prefix="", suffix="", scale=1.0):
 def _stock_summary(symbol: str) -> str:
     try:
         m = get_stock_metrics(symbol)
-        return (
+        base = (
             f"{symbol}: ${m['close_price']:.2f} (as of {m['date']}) | "
             f"52W: ${m['low_52_week']:.2f}-${m['high_52_week']:.2f} | "
             f"Fwd PE: {_fmt(m.get('forward_pe'), 1)} | "
@@ -60,6 +61,15 @@ def _stock_summary(symbol: str) -> str:
             f"Profit Margin: {_fmt(m.get('profit_margin'), 1, suffix='%', scale=100)} | "
             f"Sector: {m.get('sector') or 'N/A'}"
         )
+        # Append most recent earnings beat/miss if available
+        earnings = get_recent_earnings(symbol)
+        if earnings and earnings.get("beat_miss"):
+            base += f" | Last earnings: {earnings['beat_miss']}"
+        # Append top headline if available
+        news = get_recent_news(symbol)
+        if news:
+            base += f"\n  Latest: [{news[0]['age']}] {news[0]['title']}"
+        return base
     except Exception as e:
         return f"{symbol}: data unavailable ({e})"
 
@@ -132,7 +142,7 @@ def build_system(messages: list[dict]) -> str:
 
     return (
         "You are a knowledgeable financial analyst assistant in a stock trading dashboard.\n"
-        "You have access to live market data fetched from Yahoo Finance — use it directly.\n"
+        "You have access to live market data and recent news fetched from Yahoo Finance — use it directly.\n"
         "Never say you don't have access to real-time data. The data is provided below.\n"
         "Be direct, data-driven, and concise. Do not use markdown formatting like ** or *.\n"
         "Write in plain text only. Keep responses under 200 words unless asked for more.\n\n"

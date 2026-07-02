@@ -18,16 +18,17 @@ if _env_file.exists():
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from core.screener import run_screen, ScreenedStock
 from core.metrics import get_stock_metrics, get_market_context, get_price_history
 from core.criteria import evaluate_criteria
-from core.portfolio import get_holdings, add_holding, remove_holding, compute_gain, get_portfolio_price_history
+from core.portfolio import compute_gain, get_portfolio_price_history, _lookup_price_on_date
 from core.analysis import analyze_stock
 from core.chat import chat as stock_chat
+from core.auth import get_current_user, get_optional_user
 
 import math
 from fastapi.responses import JSONResponse
@@ -78,20 +79,25 @@ def sanitize(obj):
 async def sanitize_response(request, call_next):
     import json
     response = await call_next(request)
-    if response.headers.get("content-type", "").startswith("application/json"):
-        body = b""
-        async for chunk in response.body_iterator:
-            body += chunk
-        try:
-            data = json.loads(body)
-            clean = sanitize(data)
-            return JSONResponse(content=clean, status_code=response.status_code,
-                                headers=dict(response.headers))
-        except Exception:
-            from starlette.responses import Response
-            return Response(content=body, status_code=response.status_code,
-                            headers=dict(response.headers), media_type="application/json")
-    return response
+    # Only sanitize non-streaming JSON responses
+    content_type = response.headers.get("content-type", "")
+    if not content_type.startswith("application/json"):
+        return response
+    # Don't buffer SSE or large streams
+    body = b""
+    async for chunk in response.body_iterator:
+        body += chunk
+        if len(body) > 10 * 1024 * 1024:  # 10MB safety cap
+            break
+    try:
+        data = json.loads(body)
+        clean = sanitize(data)
+        return JSONResponse(content=clean, status_code=response.status_code,
+                            headers=dict(response.headers))
+    except Exception:
+        from starlette.responses import Response
+        return Response(content=body, status_code=response.status_code,
+                        headers=dict(response.headers), media_type="application/json")
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────
@@ -129,6 +135,17 @@ def history(symbol: str, period: str = "1y"):
         return get_price_history(symbol, period)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── News & Earnings ───────────────────────────────────────────────────────
+
+@app.get("/api/news/{symbol}")
+def stock_news(symbol: str):
+    from core.news import get_recent_news, get_recent_earnings
+    return {
+        "headlines": get_recent_news(symbol),
+        "earnings": get_recent_earnings(symbol),
+    }
 
 
 # ── Analysis ──────────────────────────────────────────────────────────────
@@ -206,10 +223,11 @@ async def generate_title(req: ChatRequest):
 
 
 @app.post("/api/chat/{symbol}")
-async def chat_endpoint(symbol: str, req: ChatRequest):
+async def chat_endpoint(symbol: str, req: ChatRequest,
+                        user_id: str = Depends(get_current_user)):
     from core.chat import build_system as build_stock_system
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
-    system = build_stock_system(symbol, messages)
+    system = build_stock_system(symbol, messages, user_id=user_id)
     return StreamingResponse(
         _stream_anthropic(system, messages, max_tokens=400),
         media_type="text/event-stream",
@@ -220,8 +238,14 @@ async def chat_endpoint(symbol: str, req: ChatRequest):
 # ── Portfolio ─────────────────────────────────────────────────────────────
 
 @app.get("/api/portfolio")
-def portfolio():
-    holdings = get_holdings()
+def portfolio(user_id: str | None = Depends(get_optional_user)):
+    from core.db import get_holdings as db_get_holdings
+    from core.portfolio import get_holdings as file_get_holdings
+    # Use Supabase if authenticated, fallback to file for unauthenticated
+    if user_id:
+        holdings = db_get_holdings(user_id)
+    else:
+        holdings = file_get_holdings()
     market = get_market_context()
     enriched = []
     for h in holdings:
@@ -230,7 +254,9 @@ def portfolio():
             metrics = get_stock_metrics(symbol)
             current = metrics["close_price"]
             gain = compute_gain(h, current)
-            sell_result = evaluate_criteria("sell", metrics, market, gain_pct=gain.get("gain_pct"))
+            sell_result = evaluate_criteria("sell", metrics, market,
+                                            gain_pct=gain.get("gain_pct"),
+                                            user_id=user_id)
             hist = get_portfolio_price_history(symbol, h["buy_date"])
         except Exception:
             metrics = None; current = None
@@ -250,41 +276,65 @@ class AddHoldingRequest(BaseModel):
 
 
 @app.post("/api/portfolio")
-def add_to_portfolio(req: AddHoldingRequest):
-    return add_holding(req.symbol, req.buy_date, req.buy_price, req.notes)
+def add_to_portfolio(req: AddHoldingRequest, user_id: str | None = Depends(get_optional_user)):
+    from core.db import upsert_holding
+    from core.portfolio import add_holding as file_add_holding
+    buy_price = req.buy_price
+    if buy_price is None:
+        buy_price = _lookup_price_on_date(req.symbol, req.buy_date)
+    if user_id:
+        return upsert_holding(user_id, req.symbol, req.buy_date, buy_price, req.notes)
+    return file_add_holding(req.symbol, req.buy_date, buy_price, req.notes)
 
 
 @app.delete("/api/portfolio/{symbol}")
-def remove_from_portfolio(symbol: str):
-    if not remove_holding(symbol):
-        raise HTTPException(status_code=404, detail=f"{symbol} not found")
+def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optional_user)):
+    from core.db import delete_holding as db_delete
+    from core.portfolio import remove_holding as file_remove
+    if user_id:
+        if not db_delete(user_id, symbol):
+            raise HTTPException(status_code=404, detail=f"{symbol} not found")
+    else:
+        if not file_remove(symbol):
+            raise HTTPException(status_code=404, detail=f"{symbol} not found")
     return {"removed": symbol}
 
 
 # ── Criteria ──────────────────────────────────────────────────────────────
 
 @app.get("/api/criteria")
-def get_criteria():
-    """Return the current criteria config."""
+def get_criteria(user_id: str = Depends(get_current_user)):
     from core.criteria import load_criteria
-    c = load_criteria()
-    # Exclude watchlist from the response (UI doesn't need it)
+    c = load_criteria(user_id)
     return {k: v for k, v in c.items() if k != "watchlist"}
 
 
 @app.put("/api/criteria")
-def update_criteria(body: dict):
-    """Overwrite buy/watch/sell criteria (preserves watchlist)."""
+def update_criteria(body: dict, user_id: str = Depends(get_current_user)):
+    from core.db import save_user_criteria
+    from core.criteria import _load_defaults
     import json
-    from pathlib import Path
-    criteria_path = Path(__file__).parent.parent / "data" / "criteria.json"
-    current = json.loads(criteria_path.read_text())
-    # Only update the three mode keys; preserve watchlist
+    defaults = _load_defaults()
+    current = {k: v for k, v in defaults.items() if k != "watchlist"}
     for mode in ("buy", "watch", "sell"):
         if mode in body:
             current[mode] = body[mode]
-    criteria_path.write_text(json.dumps(current, indent=2))
+    save_user_criteria(user_id, current)
     return {"saved": True}
+
+
+# ── User Profile ──────────────────────────────────────────────────────────
+
+@app.get("/api/profile")
+def get_profile(user_id: str = Depends(get_current_user)):
+    from core.db import get_user_profile
+    return get_user_profile(user_id)
+
+
+@app.put("/api/profile")
+def update_profile(body: dict, user_id: str = Depends(get_current_user)):
+    from core.db import save_user_profile
+    return save_user_profile(user_id, body)
 
 
 # ── Universe ──────────────────────────────────────────────────────────────
