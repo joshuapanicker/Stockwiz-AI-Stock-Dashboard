@@ -13,7 +13,7 @@ import type { HoldingWithMetrics } from "../types";
 interface Props {
   holdings: HoldingWithMetrics[];
   loading: boolean;
-  onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => void;
+  onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => Promise<void>;
   onRemove: (symbol: string) => void;
 }
 
@@ -177,8 +177,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   );
 }
 
-export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Props) {
-  const [showAddForm, setShowAddForm] = useState(false);
+export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Props) {  const [showAddForm, setShowAddForm] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
   const [buyPrice, setBuyPrice] = useState("");
@@ -207,11 +206,20 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
     }));
   }, [holdings]);
 
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   function handleAdd() {
     if (!symbol.trim()) return;
-    onAdd(symbol.trim().toUpperCase(), buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1, notes);
-    setSymbol(""); setBuyDate(new Date().toISOString().slice(0, 10));
-    setBuyPrice(""); setShares("1"); setNotes(""); setShowAddForm(false);
+    setSaving(true);
+    setSaveError(null);
+    onAdd(symbol.trim().toUpperCase(), buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1, notes)
+      .then(() => {
+        setSymbol(""); setBuyDate(new Date().toISOString().slice(0, 10));
+        setBuyPrice(""); setShares("1"); setNotes(""); setShowAddForm(false);
+      })
+      .catch((e: any) => setSaveError(e?.message ?? "Failed to save"))
+      .finally(() => setSaving(false));
   }
 
   const gainUp = netEarnings >= 0;
@@ -291,15 +299,18 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
               </div>
             </div>
             <div className="flex gap-3 pt-1">
-              <button onClick={handleAdd}
-                className="flex-1 bg-green/15 hover:bg-green/25 text-green border border-green/30 rounded-xl py-2.5 text-sm font-medium transition-colors">
-                Add Stock
+              <button onClick={handleAdd} disabled={saving}
+                className="flex-1 bg-green/15 hover:bg-green/25 disabled:opacity-50 text-green border border-green/30 rounded-xl py-2.5 text-sm font-medium transition-colors">
+                {saving ? "Saving..." : "Add Stock"}
               </button>
-              <button onClick={() => setShowAddForm(false)}
+              <button onClick={() => { setShowAddForm(false); setSaveError(null); }}
                 className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors">
                 Cancel
               </button>
             </div>
+            {saveError && (
+              <p className="text-red text-xs mt-1">{saveError}</p>
+            )}
           </div>
         )}
       </div>
