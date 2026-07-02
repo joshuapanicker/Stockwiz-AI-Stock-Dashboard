@@ -2,10 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const BASE = "/api";
 
+// Token is set by AuthContext via setAuthToken() when session is established
+let _cachedToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  _cachedToken = token;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (_cachedToken) headers["Authorization"] = `Bearer ${_cachedToken}`;
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: { ...headers, ...(options?.headers ?? {}) },
   });
   if (!res.ok) {
     const err = await res.text();
@@ -69,7 +79,9 @@ export function usePortfolio() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const addHolding = useCallback(async (symbol: string, buy_date: string, buy_price?: number, notes?: string) => {
     await apiFetch("/portfolio", {
@@ -126,8 +138,50 @@ export function useMarket() {
   return data;
 }
 
-export function useUniverseSignals() {
-  const [data, setData] = useState<any[]>([]);
+export function useProfile() {
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    apiFetch<any>("/profile")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const save = useCallback(async (profile: any) => {
+    const updated = await apiFetch<any>("/profile", {
+      method: "PUT",
+      body: JSON.stringify(profile),
+    });
+    setData(updated);
+    return updated;
+  }, []);
+
+  return { data, loading, refresh, save };
+}
+
+export function useNewsData(symbol: string | null) {
+  const [data, setData] = useState<{ headlines: any[]; earnings: any | null } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!symbol) return;
+    setLoading(true);
+    setData(null);
+    apiFetch<any>(`/news/${symbol}`)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [symbol]);
+
+  return { data, loading };
+}
+
+export function useUniverseSignals() {  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {

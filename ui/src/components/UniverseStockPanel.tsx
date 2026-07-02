@@ -11,6 +11,7 @@ import { X, ShoppingCart, RefreshCw } from "lucide-react";
 import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
 import StockChat from "./StockChat";
+import NewsPanel from "./NewsPanel";
 import { usePriceHistory, useAnalysis, apiFetch } from "../hooks/useApi";
 import type { UniverseStock } from "../types";
 
@@ -22,7 +23,7 @@ interface Props {
 }
 
 type ChartMode = "candle" | "area";
-type RightTab = "analysis" | "chat";
+type RightTab = "analysis" | "chat" | "news";
 
 export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onAddToPortfolio }: Props) {
   const [chartMode, setChartMode] = useState<ChartMode>("candle");
@@ -137,18 +138,22 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
       {/* Tab switcher */}
       <div className="px-4 pt-3 flex-shrink-0">
         <div className="flex gap-1 bg-card2 rounded-lg p-0.5">
-          {(["analysis", "chat"] as RightTab[]).map(t => (
+          {(["analysis", "news", "chat"] as RightTab[]).map(t => (
             <button key={t} onClick={() => setRightTab(t)}
               className={clsx("flex-1 py-1.5 rounded-md text-xs font-medium transition-colors",
                 rightTab === t ? "bg-white/10 text-white" : "text-muted hover:text-white")}>
-              {t === "analysis" ? "AI Analysis" : "Chat"}
+              {t === "analysis" ? "AI Analysis" : t === "news" ? "News" : "Chat"}
             </button>
           ))}
         </div>
       </div>
 
       {/* Tab content */}
-      {rightTab === "analysis" ? (
+      {rightTab === "news" ? (
+        <div className="px-4 pt-3 pb-4 flex-shrink-0">
+          <NewsPanel symbol={symbol} />
+        </div>
+      ) : rightTab === "analysis" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0 space-y-3">
           {analysisLoading ? (
             <div className="bg-card2 rounded-lg p-3 text-xs text-muted animate-pulse flex items-center gap-2">
