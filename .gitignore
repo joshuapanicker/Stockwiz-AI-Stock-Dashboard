@@ -22,3 +22,7 @@ data/universe.db
 
 # Frontend env (contains Supabase keys)
 ui/.env.local
+
+# PDFs and documents
+*.pdf
+*.docx
