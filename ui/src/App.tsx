@@ -113,6 +113,7 @@ export default function App() {
 
   const enrichedHoldings: HoldingWithMetrics[] = useMemo(() => portfolio.map((h: any) => ({
     ...h,
+    shares: h.shares ?? 1,
     current_price: h.current_price ?? null,
     gain_pct: h.gain_pct ?? null,
     gain_abs: h.gain_abs ?? null,
