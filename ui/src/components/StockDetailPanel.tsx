@@ -15,7 +15,7 @@ import { generateDepthData } from "../utils/mockDepth";
 interface Props {
   stock: ScreenedStock;
   onClose: () => void;
-  onAddToPortfolio: (symbol: string, buyDate: string, buyPrice?: number) => void;
+  onAddToPortfolio: (symbol: string, buyDate: string, buyPrice?: number, shares?: number) => void;
 }
 
 type ChartMode = "candle" | "area";
@@ -27,6 +27,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
   const [showAddForm, setShowAddForm] = useState(false);
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
   const [buyPrice, setBuyPrice] = useState("");
+  const [shares, setShares] = useState("1");
   const [rightTab, setRightTab] = useState<RightTab>("analysis");
 
   const { data: history, loading: histLoading } = usePriceHistory(stock.symbol, period);
@@ -41,7 +42,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
 
   function handleAdd() {
     const price = buyPrice ? parseFloat(buyPrice) : undefined;
-    onAddToPortfolio(stock.symbol, buyDate, price);
+    onAddToPortfolio(stock.symbol, buyDate, price, parseFloat(shares) || 1);
     setShowAddForm(false);
   }
 
@@ -212,6 +213,12 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
                 <div className="flex-1">
                   <label className="text-[10px] text-muted">Buy Date</label>
                   <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)}
+                    className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-white mt-0.5 focus:outline-none focus:border-green/50" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted">Shares</label>
+                  <input type="number" min="0.001" step="any" placeholder="1" value={shares}
+                    onChange={(e) => setShares(e.target.value)}
                     className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-white mt-0.5 focus:outline-none focus:border-green/50" />
                 </div>
                 <div className="flex-1">

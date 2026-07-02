@@ -68,6 +68,7 @@ export interface Holding {
   symbol: string;
   buy_date: string;
   buy_price: number | null;
+  shares: number;
   notes: string;
 }
 
@@ -75,6 +76,7 @@ export interface HoldingWithMetrics extends Holding {
   current_price: number | null;
   gain_pct: number | null;
   gain_abs: number | null;
+  total_value: number | null;
   sell_result: CriteriaResult | null;
   metrics: StockMetrics | null;
   history: { date: string; close: number }[];

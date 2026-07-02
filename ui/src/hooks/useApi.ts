@@ -90,13 +90,13 @@ export function usePortfolio() {
     load();
   }, [load]);
 
-  const addHolding = useCallback(async (symbol: string, buy_date: string, buy_price?: number, notes?: string) => {
+  const addHolding = useCallback(async (symbol: string, buy_date: string, buy_price?: number, shares?: number, notes?: string) => {
     // Retry once if we get 401 — token may still be initializing
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         await apiFetch("/portfolio", {
           method: "POST",
-          body: JSON.stringify({ symbol, buy_date, buy_price, notes }),
+          body: JSON.stringify({ symbol, buy_date, buy_price, shares: shares ?? 1, notes }),
         });
         await load();
         return;

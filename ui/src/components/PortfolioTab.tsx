@@ -12,7 +12,7 @@ import type { HoldingWithMetrics } from "../types";
 interface Props {
   holdings: HoldingWithMetrics[];
   loading: boolean;
-  onAdd: (symbol: string, buyDate: string, buyPrice?: number, notes?: string) => void;
+  onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => void;
   onRemove: (symbol: string) => void;
 }
 
@@ -177,6 +177,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
   const [buyPrice, setBuyPrice] = useState("");
+  const [shares, setShares] = useState("1");
   const [notes, setNotes] = useState("");
 
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
@@ -203,9 +204,9 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
 
   function handleAdd() {
     if (!symbol.trim()) return;
-    onAdd(symbol.trim().toUpperCase(), buyDate, buyPrice ? parseFloat(buyPrice) : undefined, notes);
+    onAdd(symbol.trim().toUpperCase(), buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1, notes);
     setSymbol(""); setBuyDate(new Date().toISOString().slice(0, 10));
-    setBuyPrice(""); setNotes(""); setShowAddForm(false);
+    setBuyPrice(""); setShares("1"); setNotes(""); setShowAddForm(false);
   }
 
   const gainUp = netEarnings >= 0;
@@ -266,6 +267,12 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
               <div>
                 <label className="text-xs text-muted">Buy Date</label>
                 <input type="date" value={buyDate} onChange={e => setBuyDate(e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-green/50" />
+              </div>
+              <div>
+                <label className="text-xs text-muted">Shares</label>
+                <input type="number" min="0.001" step="any" placeholder="1" value={shares}
+                  onChange={e => setShares(e.target.value)}
                   className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-green/50" />
               </div>
               <div>

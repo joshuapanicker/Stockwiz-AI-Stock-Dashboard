@@ -33,12 +33,14 @@ def get_holdings(user_id: str) -> list[dict]:
 
 
 def upsert_holding(user_id: str, symbol: str, buy_date: str,
-                   buy_price: float | None, notes: str) -> dict:
+                   buy_price: float | None, notes: str,
+                   shares: float = 1.0) -> dict:
     row = {
         "user_id": user_id,
         "symbol": symbol.upper(),
         "buy_date": buy_date,
         "buy_price": buy_price,
+        "shares": shares,
         "notes": notes,
     }
     res = get_client().table("portfolios").upsert(row, on_conflict="user_id,symbol").execute()

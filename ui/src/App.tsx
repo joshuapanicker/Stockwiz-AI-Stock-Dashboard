@@ -116,6 +116,7 @@ export default function App() {
     current_price: h.current_price ?? null,
     gain_pct: h.gain_pct ?? null,
     gain_abs: h.gain_abs ?? null,
+    total_value: h.total_value ?? null,
     sell_result: h.sell_result ?? null,
     metrics: h.metrics ?? null,
     history: h.history ?? [],
