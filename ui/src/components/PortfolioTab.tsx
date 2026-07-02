@@ -177,13 +177,16 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   );
 }
 
-export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Props) {  const [showAddForm, setShowAddForm] = useState(false);
+export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Props) {
+  const [showAddForm, setShowAddForm] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
   const [buyPrice, setBuyPrice] = useState("");
   const [shares, setShares] = useState("1");
   const [notes, setNotes] = useState("");
-
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [optimisticSymbol, setOptimisticSymbol] = useState<string | null>(null);
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
   const avgGain = holdings.length
     ? holdings.reduce((s, h) => s + (h.gain_pct ?? 0), 0) / holdings.length : 0;
@@ -206,21 +209,26 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
     }));
   }, [holdings]);
 
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   function handleAdd() {
     if (!symbol.trim()) return;
     setSaving(true);
     setSaveError(null);
-    onAdd(symbol.trim().toUpperCase(), buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1, notes)
-      .then(() => {
-        setSymbol(""); setBuyDate(new Date().toISOString().slice(0, 10));
-        setBuyPrice(""); setShares("1"); setNotes(""); setShowAddForm(false);
+    const sym = symbol.trim().toUpperCase();
+    setOptimisticSymbol(sym); // show placeholder immediately
+    setShowAddForm(false);    // close form right away for responsiveness
+    setSymbol(""); setBuyDate(new Date().toISOString().slice(0, 10));
+    setBuyPrice(""); setShares("1"); setNotes("");
+    onAdd(sym, buyDate, buyPrice ? parseFloat(buyPrice) : undefined, parseFloat(shares) || 1, notes)
+      .then(() => { setOptimisticSymbol(null); })
+      .catch((e: any) => {
+        setOptimisticSymbol(null);
+        setSaveError(e?.message ?? "Failed to save");
+        setShowAddForm(true); // reopen form on error
       })
-      .catch((e: any) => setSaveError(e?.message ?? "Failed to save"))
       .finally(() => setSaving(false));
   }
+
+
 
   const gainUp = netEarnings >= 0;
 
@@ -429,6 +437,24 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                   <div className="text-muted text-sm text-center py-12">Loading...</div>
                 ) : (
                   holdings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
+                )}
+                {/* Optimistic placeholder while new holding is loading */}
+                {optimisticSymbol && !holdings.find(h => h.symbol === optimisticSymbol) && (
+                  <div className="rounded-2xl border border-green/20 bg-green/5 overflow-hidden">
+                    <div className="flex items-center gap-4 px-5 py-4">
+                      <div className="w-11 h-11 rounded-2xl bg-green/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-green font-bold text-sm">{optimisticSymbol.slice(0,2)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-white font-semibold text-sm">{optimisticSymbol}</p>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green/10 text-green border border-green/20">Adding...</span>
+                        </div>
+                        <p className="text-muted text-xs mt-0.5">Fetching current price...</p>
+                      </div>
+                      <div className="w-6 h-6 border-2 border-green/30 border-t-green rounded-full animate-spin" />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
