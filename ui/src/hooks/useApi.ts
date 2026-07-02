@@ -187,6 +187,41 @@ export function useNewsData(symbol: string | null) {
   return { data, loading };
 }
 
+export function useAlerts() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    apiFetch<any[]>("/alerts")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const createAlert = useCallback(async (symbol: string, alert_type: string, threshold?: number) => {
+    await apiFetch("/alerts", { method: "POST", body: JSON.stringify({ symbol, alert_type, threshold }) });
+    await load();
+  }, [load]);
+
+  const deleteAlert = useCallback(async (id: string) => {
+    await apiFetch(`/alerts/${id}`, { method: "DELETE" });
+    await load();
+  }, [load]);
+
+  const toggleAlert = useCallback(async (id: string, enabled: boolean) => {
+    await apiFetch(`/alerts/${id}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
+    await load();
+  }, [load]);
+
+  const checkAlerts = useCallback(async () => {
+    return apiFetch<any[]>("/alerts/check", { method: "POST" });
+  }, []);
+
+  return { data, loading, refresh: load, createAlert, deleteAlert, toggleAlert, checkAlerts };
+}
+
 export function useUniverseSignals() {  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

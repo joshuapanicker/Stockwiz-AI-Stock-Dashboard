@@ -300,6 +300,62 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
     return {"removed": symbol}
 
 
+# ── Alerts ────────────────────────────────────────────────────────────────
+
+@app.get("/api/alerts")
+def list_alerts(user_id: str | None = Depends(get_optional_user)):
+    if not user_id:
+        return []
+    from core.alerts import get_alerts
+    return get_alerts(user_id)
+
+
+class CreateAlertRequest(BaseModel):
+    symbol: str
+    alert_type: str
+    threshold: float | None = None
+
+
+@app.post("/api/alerts")
+def create_alert_endpoint(req: CreateAlertRequest, user_id: str | None = Depends(get_optional_user)):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Must be logged in to create alerts")
+    from core.alerts import create_alert
+    return create_alert(user_id, req.symbol, req.alert_type, req.threshold)
+
+
+@app.delete("/api/alerts/{alert_id}")
+def delete_alert_endpoint(alert_id: str, user_id: str | None = Depends(get_optional_user)):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.alerts import delete_alert
+    if not delete_alert(user_id, alert_id):
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"deleted": alert_id}
+
+
+class ToggleAlertRequest(BaseModel):
+    enabled: bool
+
+
+@app.patch("/api/alerts/{alert_id}")
+def toggle_alert_endpoint(alert_id: str, req: ToggleAlertRequest,
+                           user_id: str | None = Depends(get_optional_user)):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.alerts import toggle_alert
+    return toggle_alert(user_id, alert_id, req.enabled)
+
+
+@app.post("/api/alerts/check")
+def check_alerts_endpoint(user_id: str | None = Depends(get_optional_user)):
+    """Evaluate all alerts and return which ones are currently firing."""
+    if not user_id:
+        return []
+    from core.alerts import check_alerts
+    return check_alerts(user_id)
+
+
 # ── Criteria ──────────────────────────────────────────────────────────────
 
 @app.get("/api/criteria")
