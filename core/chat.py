@@ -6,6 +6,7 @@ import anthropic
 from core.metrics import get_stock_metrics, get_market_context
 from core.criteria import evaluate_criteria, load_criteria
 from core.portfolio import get_holdings, compute_gain
+from core.news import build_news_context
 
 
 def _fmt(val, decimals=2, prefix="", suffix="", scale=1.0):
@@ -77,6 +78,7 @@ def _stock_context(symbol: str) -> str:
         f"{watch_desc}\n"
         f"Current status ({watch_result['rules_met']}/{watch_result['rules_total']} conditions met):\n{watch_rules}"
         f"{portfolio_ctx}"
+        f"{build_news_context(symbol)}"
     )
 
 
@@ -108,15 +110,43 @@ def chat(symbol: str, messages: list[dict]) -> str:
     return response.content[0].text if response.content else ""
 
 
-def build_system(symbol: str, messages: list[dict]) -> str:
+def _profile_context(user_id: str | None) -> str:
+    """Build a profile context string to inject into prompts."""
+    if not user_id:
+        return ""
+    try:
+        from core.db import get_user_profile
+        p = get_user_profile(user_id)
+        parts = ["\nUser investment profile (tailor your analysis to this):"]
+        parts.append(f"- Risk tolerance: {p.get('risk_tolerance', 'moderate')}")
+        parts.append(f"- Hold duration preference: {p.get('hold_duration', 'medium')}")
+        max_pos = p.get("max_position_usd")
+        if max_pos:
+            parts.append(f"- Max position size: ${max_pos:,.0f}")
+        sectors = p.get("preferred_sectors") or []
+        if sectors:
+            parts.append(f"- Preferred sectors: {', '.join(sectors)}")
+        if p.get("tax_sensitive"):
+            parts.append("- Tax-sensitive: prefer long-term gains, flag short-term implications")
+        notes = p.get("notes", "").strip()
+        if notes:
+            parts.append(f"- Additional notes: {notes}")
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+def build_system(symbol: str, messages: list[dict], user_id: str | None = None) -> str:
     """Return the system prompt with live stock context for streaming."""
     stock_ctx = _stock_context(symbol)
+    profile_ctx = _profile_context(user_id)
     return (
         f"You are a sharp, concise stock analysis assistant in a trading dashboard.\n"
         f"You have live data for {symbol} below. Use the exact numbers provided.\n"
         f"Never say you cannot access data. Be direct and data-driven.\n"
         f"When explaining criteria, describe conditions in plain English.\n"
         f"Do not use markdown formatting like ** or *. Write in plain text only.\n"
-        f"Keep responses under 150 words unless the user asks for more detail.\n\n"
+        f"Keep responses under 150 words unless the user asks for more detail.\n"
+        f"{profile_ctx}\n\n"
         f"Live data for {symbol}:\n{stock_ctx}"
     )
