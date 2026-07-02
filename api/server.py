@@ -302,6 +302,36 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
     return {"removed": symbol}
 
 
+# ── Symbol search (typeahead) ─────────────────────────────────────────────
+
+@app.get("/api/search")
+def search_symbols(q: str = ""):
+    """
+    Fast symbol/company search against the universe cache.
+    Returns up to 10 matches ordered by market cap.
+    """
+    from core.universe_cache import _connect
+    if not q or len(q.strip()) < 1:
+        return []
+    q = q.strip().upper()
+    with _connect() as conn:
+        rows = conn.execute("""
+            SELECT symbol, sector, close_price, market_cap
+            FROM universe_stocks
+            WHERE fetch_error IS NULL
+              AND close_price IS NOT NULL
+              AND (
+                UPPER(symbol) LIKE ? OR
+                UPPER(symbol) = ?
+              )
+            ORDER BY market_cap DESC NULLS LAST
+            LIMIT 10
+        """, (f"{q}%", q)).fetchall()
+    return [{"symbol": r["symbol"], "sector": r["sector"],
+             "close_price": r["close_price"], "market_cap": r["market_cap"]}
+            for r in rows]
+
+
 # ── Financials ────────────────────────────────────────────────────────────
 
 @app.get("/api/financials/{symbol}")

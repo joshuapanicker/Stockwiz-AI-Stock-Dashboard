@@ -8,6 +8,7 @@ import StockChat from "./StockChat";
 import NewsPanel from "./NewsPanel";
 import FinancialsTab from "./FinancialsTab";
 import TechnicalsTab from "./TechnicalsTab";
+import SymbolSearch from "./SymbolSearch";
 import { usePriceHistory, useAnalysis } from "../hooks/useApi";
 import type { ScreenedStock } from "../types";
 import { generateDepthData } from "../utils/mockDepth";

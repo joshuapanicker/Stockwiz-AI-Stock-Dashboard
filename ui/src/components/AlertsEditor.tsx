@@ -9,6 +9,7 @@ import {
   TrendingUp, TrendingDown, Zap, Eye, Check, AlertCircle,
 } from "lucide-react";
 import { useAlerts } from "../hooks/useApi";
+import SymbolSearch from "./SymbolSearch";
 
 const ALERT_TYPES = [
   { value: "price_below",          label: "Price drops below",       icon: <TrendingDown size={13} />, needsThreshold: true,  hint: "e.g. notify me when AAPL drops below $250" },
@@ -71,8 +72,13 @@ function AddAlertForm({ onCreate, onCancel }: {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-muted block mb-1.5">Stock symbol</label>
-          <input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())}
-            placeholder="e.g. AAPL" className={`${inp} font-mono`} />
+          <SymbolSearch
+            value={symbol}
+            onChange={setSymbol}
+            onSelect={setSymbol}
+            placeholder="Search ticker..."
+            autoFocus
+          />
         </div>
         <div>
           <label className="text-xs text-muted block mb-1.5">Alert type</label>
