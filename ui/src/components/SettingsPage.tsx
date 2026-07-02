@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import clsx from "clsx";
 import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check } from "lucide-react";
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
+import AlertsEditor from "./AlertsEditor";
 import { apiFetch, useProfile } from "../hooks/useApi";
 
 type SettingsTab = "profile" | "criteria" | "notifications" | "security";
@@ -250,18 +251,16 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria" }:
             </div>
           )}
 
-          {/* ── Notifications (stub) ── */}
+          {/* ── Notifications ── */}
           {activeTab === "notifications" && (
             <div className="max-w-2xl">
-              <h2 className="text-white font-bold text-xl mb-2">Notifications</h2>
-              <p className="text-muted text-sm mb-8">Configure price alerts and criteria-based notifications.</p>
-              <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-8 flex flex-col items-center gap-3 text-center">
-                <Bell size={28} className="text-muted" />
-                <p className="text-white font-semibold">Coming Soon</p>
-                <p className="text-muted text-sm max-w-xs">
-                  Price alerts and criteria-based notifications will be available in a future update.
+              <div className="mb-6">
+                <h2 className="text-white font-bold text-xl">Alerts & Notifications</h2>
+                <p className="text-muted text-sm mt-1">
+                  Set price targets or criteria-based triggers. Click "Check now" to evaluate your alerts against live data.
                 </p>
               </div>
+              <AlertsEditor />
             </div>
           )}
 
