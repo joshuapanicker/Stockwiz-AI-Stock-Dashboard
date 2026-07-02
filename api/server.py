@@ -260,10 +260,13 @@ def portfolio(user_id: str | None = Depends(get_optional_user)):
             hist = get_portfolio_price_history(symbol, h["buy_date"])
         except Exception:
             metrics = None; current = None
-            gain = {"gain_pct": None, "gain_abs": None}
+            gain = {"gain_pct": None, "gain_abs": None, "total_value": None}
             sell_result = None; hist = []
-        enriched.append({**h, "current_price": current, "gain_pct": gain.get("gain_pct"),
-                         "gain_abs": gain.get("gain_abs"), "sell_result": sell_result,
+        enriched.append({**h, "current_price": current,
+                         "gain_pct": gain.get("gain_pct"),
+                         "gain_abs": gain.get("gain_abs"),
+                         "total_value": gain.get("total_value"),
+                         "sell_result": sell_result,
                          "metrics": metrics, "history": hist})
     return enriched
 

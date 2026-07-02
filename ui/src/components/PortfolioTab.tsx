@@ -88,7 +88,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
               {shouldSell ? "SELL" : "HOLD"}
             </span>
           </div>
-          <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · avg ${h.buy_price?.toFixed(2) ?? "—"}</p>
+          <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · {h.shares ?? 1} shares @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
         </div>
 
         {/* Price + gain */}
@@ -101,9 +101,9 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
         </div>
 
         {/* P&L */}
-        <div className="text-right w-24">
+        <div className="text-right w-28">
           <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
-            {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toFixed(2)}` : "—"}
+            {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
           </p>
           <p className="text-muted text-[10px]">unrealized P&L</p>
         </div>
@@ -126,9 +126,13 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
           <div className="grid grid-cols-4 gap-3">
             {[
               { label: "Buy Price", value: h.buy_price != null ? `$${h.buy_price.toFixed(2)}` : "—" },
-              { label: "Current", value: h.current_price != null ? `$${h.current_price.toFixed(2)}` : "—" },
-              { label: "P&L ($)", value: h.gain_abs != null ? `${h.gain_abs >= 0 ? "+" : ""}$${h.gain_abs.toFixed(2)}` : "—" },
+              { label: "Shares", value: h.shares != null ? String(h.shares) : "1" },
+              { label: "Total Value", value: h.total_value != null ? `$${h.total_value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
               { label: "P&L (%)", value: h.gain_pct != null ? `${h.gain_pct >= 0 ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—" },
+              { label: "Cost Basis", value: (h.buy_price != null && h.shares != null) ? `$${(h.buy_price * h.shares).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
+              { label: "Current Price", value: h.current_price != null ? `$${h.current_price.toFixed(2)}` : "—" },
+              { label: "P&L ($)", value: h.gain_abs != null ? `${h.gain_abs >= 0 ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
+              { label: "Gain/Share", value: (h.gain_pct != null && h.buy_price != null) ? `${h.gain_pct >= 0 ? "+" : ""}$${(h.gain_pct * h.buy_price).toFixed(2)}` : "—" },
             ].map(({ label, value }) => (
               <div key={label} className="bg-white/[0.03] rounded-xl px-3 py-3 border border-border/30">
                 <p className="text-muted text-[10px]">{label}</p>
@@ -230,7 +234,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                 "text-5xl font-bold font-mono tracking-tight",
                 !hasData ? "text-white" : gainUp ? "text-green" : "text-red"
               )}>
-                {hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toFixed(2)}` : "—"}
+                {hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
               </h1>
               {hasData && (
                 <div className={clsx(
@@ -385,7 +389,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
             {/* Stats row */}
             <div className="grid grid-cols-4 gap-3 stagger anim-fade-up" style={{ animationDelay: "160ms" }}>
               {[
-                { label: "Net P&L", value: hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toFixed(2)}` : "—",
+                { label: "Net P&L", value: hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—",
                   color: !hasData ? "text-muted" : gainUp ? "text-green" : "text-red", sub: "Unrealized earnings" },
                 { label: "Avg Return", value: `${avgGain >= 0 ? "+" : ""}${(avgGain * 100).toFixed(2)}%`,
                   color: avgGain >= 0 ? "text-green" : "text-red", sub: "Mean gain" },
