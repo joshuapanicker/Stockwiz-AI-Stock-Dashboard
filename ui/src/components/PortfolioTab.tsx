@@ -6,6 +6,7 @@ import {
   ReferenceLine, PieChart, Pie, Cell
 } from "recharts";
 import PortfolioChart from "./PortfolioChart";
+import SymbolSearch from "./SymbolSearch";
 import { useAnalysis, useUniverseSignals } from "../hooks/useApi";
 import type { HoldingWithMetrics } from "../types";
 
@@ -260,9 +261,13 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
         {showAddForm && (
           <div className="relative mt-6 bg-card2 rounded-2xl p-5 border border-border/50 space-y-3">
             <p className="text-sm font-semibold text-white">Add Stock</p>
-            <input placeholder="Ticker symbol (e.g. AAPL)" value={symbol}
-              onChange={e => setSymbol(e.target.value.toUpperCase())}
-              className="w-full bg-card border border-border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-green/50 font-mono" />
+            <SymbolSearch
+              value={symbol}
+              onChange={setSymbol}
+              onSelect={setSymbol}
+              placeholder="Search ticker (e.g. AAPL, NVDA)..."
+              autoFocus
+            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted">Buy Date</label>
