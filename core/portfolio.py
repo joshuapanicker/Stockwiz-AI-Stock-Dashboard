@@ -38,12 +38,14 @@ def get_holdings() -> list[dict]:
     return _load().get("holdings", [])
 
 
-def add_holding(symbol: str, buy_date: str, buy_price: float | None = None, notes: str = "") -> dict:
+def add_holding(symbol: str, buy_date: str, buy_price: float | None = None,
+                notes: str = "", shares: float = 1.0) -> dict:
     symbol = symbol.strip().upper()
     if buy_price is None:
         buy_price = _lookup_price_on_date(symbol, buy_date)
 
-    holding = {"symbol": symbol, "buy_date": buy_date, "buy_price": buy_price, "notes": notes}
+    holding = {"symbol": symbol, "buy_date": buy_date, "buy_price": buy_price,
+               "shares": shares, "notes": notes}
     data = _load()
     data["holdings"] = [h for h in data["holdings"] if h["symbol"] != symbol]
     data["holdings"].append(holding)
