@@ -32,9 +32,9 @@ def get_plaid_client() -> plaid_api.PlaidApi:
         raise RuntimeError("PLAID_CLIENT_ID and PLAID_SECRET must be set")
 
     env_map = {
-        "sandbox": plaid.Environment.Sandbox,
-        "development": plaid.Environment.Development,
-        "production": plaid.Environment.Production,
+        "sandbox":     plaid.Environment.Sandbox,
+        "development": plaid.Environment.Sandbox,   # v40 has no Development, use Sandbox
+        "production":  plaid.Environment.Production,
     }
     plaid_env = env_map.get(env, plaid.Environment.Sandbox)
 
