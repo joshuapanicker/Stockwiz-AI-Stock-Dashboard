@@ -351,44 +351,69 @@ def plaid_exchange(req: PlaidExchangeRequest, user_id: str | None = Depends(get_
 
 @app.get("/api/plaid/holdings")
 def plaid_holdings(user_id: str | None = Depends(get_optional_user)):
-    """Fetch real brokerage holdings from connected Plaid account."""
+    """Fetch real brokerage holdings from ALL connected Plaid accounts, merged."""
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    from core.plaid_client import get_plaid_token, get_holdings
-    access_token = get_plaid_token(user_id)
-    if not access_token:
+    from core.plaid_client import get_plaid_tokens, get_holdings
+    connections = get_plaid_tokens(user_id)
+    if not connections:
         return {"connected": False, "holdings": []}
-    try:
-        holdings = get_holdings(access_token)
-        return {"connected": True, "holdings": holdings}
-    except Exception as e:
-        return {"connected": False, "holdings": [], "error": str(e)}
+    all_holdings: list[dict] = []
+    errors: list[str] = []
+    for conn in connections:
+        try:
+            h = get_holdings(conn["access_token"])
+            # Tag each holding with which institution it came from
+            for item in h:
+                item["institution"] = conn.get("institution_name", "")
+            all_holdings.extend(h)
+        except Exception as e:
+            errors.append(f"{conn.get('institution_name', conn['id'])}: {e}")
+    return {
+        "connected": True,
+        "holdings": all_holdings,
+        "errors": errors if errors else None,
+    }
 
 
 @app.get("/api/plaid/status")
 def plaid_status(user_id: str | None = Depends(get_optional_user)):
-    """Check if user has a connected Plaid account."""
+    """Return list of all connected Plaid accounts for the user."""
     try:
         if not user_id:
-            return {"connected": False}
-        from core.plaid_client import get_plaid_token
-        from core.db import get_client
-        res = (get_client().table("plaid_connections")
-               .select("institution_name, updated_at")
-               .eq("user_id", user_id)
-               .maybe_single()
-               .execute())
-        if res.data:
-            return {"connected": True, "institution": res.data.get("institution_name", ""), "updated_at": res.data.get("updated_at")}
-        return {"connected": False}
+            return {"connected": False, "connections": []}
+        from core.plaid_client import get_plaid_tokens
+        connections = get_plaid_tokens(user_id)
+        if connections:
+            return {
+                "connected": True,
+                "connections": [
+                    {
+                        "id": c["id"],
+                        "institution": c.get("institution_name", ""),
+                        "updated_at": c.get("updated_at"),
+                    }
+                    for c in connections
+                ],
+            }
+        return {"connected": False, "connections": []}
     except Exception as e:
-        # Return connected:False rather than crashing so CORS is maintained
-        return {"connected": False, "error": str(e)}
+        return {"connected": False, "connections": [], "error": str(e)}
+
+
+@app.delete("/api/plaid/disconnect/{connection_id}")
+def plaid_disconnect(connection_id: str, user_id: str | None = Depends(get_optional_user)):
+    """Remove a specific Plaid connection by its UUID."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.plaid_client import delete_plaid_connection
+    delete_plaid_connection(user_id, connection_id)
+    return {"disconnected": connection_id}
 
 
 @app.delete("/api/plaid/disconnect")
-def plaid_disconnect(user_id: str | None = Depends(get_optional_user)):
-    """Remove Plaid connection for user."""
+def plaid_disconnect_all(user_id: str | None = Depends(get_optional_user)):
+    """Remove ALL Plaid connections for user (legacy fallback)."""
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
     from core.plaid_client import delete_plaid_connection
