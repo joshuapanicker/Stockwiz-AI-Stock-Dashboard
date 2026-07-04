@@ -342,8 +342,10 @@ def plaid_exchange(req: PlaidExchangeRequest, user_id: str | None = Depends(get_
         raise HTTPException(status_code=401, detail="Not authenticated")
     from core.plaid_client import exchange_public_token, save_plaid_token
     try:
-        access_token = exchange_public_token(req.public_token)
-        save_plaid_token(user_id, access_token, req.institution_name)
+        result = exchange_public_token(req.public_token)
+        access_token = result["access_token"]
+        item_id = result["item_id"]
+        save_plaid_token(user_id, access_token, req.institution_name, item_id)
         return {"connected": True, "institution": req.institution_name}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -363,9 +365,15 @@ def plaid_holdings(user_id: str | None = Depends(get_optional_user)):
     for conn in connections:
         try:
             h = get_holdings(conn["access_token"])
-            # Tag each holding with which institution it came from
+            # Tag each holding with the institution name; fall back to a short
+            # unique identifier so multiple anonymous connections are distinguishable
+            label = (conn.get("institution_name") or "").strip()
+            if not label:
+                # Use last 6 chars of item_id or connection id as a readable fallback
+                fallback_id = (conn.get("item_id") or conn.get("id") or "")[-6:]
+                label = f"Account …{fallback_id}" if fallback_id else "Unknown Account"
             for item in h:
-                item["institution"] = conn.get("institution_name", "")
+                item["institution"] = label
             all_holdings.extend(h)
         except Exception as e:
             errors.append(f"{conn.get('institution_name', conn['id'])}: {e}")

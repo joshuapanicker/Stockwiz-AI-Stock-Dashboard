@@ -174,7 +174,7 @@ export default function PlaidConnect({ onHoldingsSynced, onHoldingsRemoved }: Pr
                   ? h.cost_basis / h.quantity
                   : null,
                 shares: h.quantity,
-                notes: `Synced from ${h.institution || "brokerage"}`,
+                notes: `Synced from ${h.institution || `Account …${String(Date.now()).slice(-6)}`}`,
               }),
             })
           )
