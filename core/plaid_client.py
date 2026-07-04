@@ -102,29 +102,39 @@ def get_holdings(access_token: str) -> list[dict]:
     return holdings
 
 
-def save_plaid_token(user_id: str, access_token: str, institution_name: str = "") -> None:
-    """Store Plaid access token in Supabase."""
+def save_plaid_token(user_id: str, access_token: str, institution_name: str = "", item_id: str = "") -> None:
+    """Store a new Plaid access token — supports multiple connections per user."""
     from core.db import get_client
-    get_client().table("plaid_connections").upsert({
+    get_client().table("plaid_connections").insert({
         "user_id": user_id,
         "access_token": access_token,
+        "item_id": item_id,
         "institution_name": institution_name,
         "updated_at": "now()",
-    }, on_conflict="user_id").execute()
+    }).execute()
+
+
+def get_plaid_tokens(user_id: str) -> list[dict]:
+    """Retrieve all Plaid connections for a user."""
+    from core.db import get_client
+    res = (get_client().table("plaid_connections")
+           .select("*")
+           .eq("user_id", user_id)
+           .order("updated_at", desc=False)
+           .execute())
+    return res.data or []
 
 
 def get_plaid_token(user_id: str) -> str | None:
-    """Retrieve stored Plaid access token for a user."""
-    from core.db import get_client
-    res = (get_client().table("plaid_connections")
-           .select("access_token")
-           .eq("user_id", user_id)
-           .maybe_single()
-           .execute())
-    return res.data["access_token"] if res.data else None
+    """Get the first access token (legacy single-connection helper)."""
+    tokens = get_plaid_tokens(user_id)
+    return tokens[0]["access_token"] if tokens else None
 
 
-def delete_plaid_connection(user_id: str) -> None:
-    """Remove a user's Plaid connection."""
+def delete_plaid_connection(user_id: str, connection_id: str | None = None) -> None:
+    """Remove a specific Plaid connection (or all if no id given)."""
     from core.db import get_client
-    get_client().table("plaid_connections").delete().eq("user_id", user_id).execute()
+    query = get_client().table("plaid_connections").delete().eq("user_id", user_id)
+    if connection_id:
+        query = query.eq("id", connection_id)
+    query.execute()
