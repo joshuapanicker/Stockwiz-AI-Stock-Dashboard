@@ -36,6 +36,16 @@ from fastapi.responses import JSONResponse
 app = FastAPI(title="StockWiz API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Ensure CORS headers are present even on unhandled 500 errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
 
 @app.on_event("startup")
 async def prewarm():
@@ -358,18 +368,22 @@ def plaid_holdings(user_id: str | None = Depends(get_optional_user)):
 @app.get("/api/plaid/status")
 def plaid_status(user_id: str | None = Depends(get_optional_user)):
     """Check if user has a connected Plaid account."""
-    if not user_id:
+    try:
+        if not user_id:
+            return {"connected": False}
+        from core.plaid_client import get_plaid_token
+        from core.db import get_client
+        res = (get_client().table("plaid_connections")
+               .select("institution_name, updated_at")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        if res.data:
+            return {"connected": True, "institution": res.data.get("institution_name", ""), "updated_at": res.data.get("updated_at")}
         return {"connected": False}
-    from core.plaid_client import get_plaid_token
-    from core.db import get_client
-    res = (get_client().table("plaid_connections")
-           .select("institution_name, updated_at")
-           .eq("user_id", user_id)
-           .maybe_single()
-           .execute())
-    if res.data:
-        return {"connected": True, "institution": res.data.get("institution_name", ""), "updated_at": res.data.get("updated_at")}
-    return {"connected": False}
+    except Exception as e:
+        # Return connected:False rather than crashing so CORS is maintained
+        return {"connected": False, "error": str(e)}
 
 
 @app.delete("/api/plaid/disconnect")
