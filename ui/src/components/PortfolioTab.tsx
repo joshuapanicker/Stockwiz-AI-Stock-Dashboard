@@ -16,6 +16,7 @@ interface Props {
   loading: boolean;
   onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => Promise<void>;
   onRemove: (symbol: string) => void;
+  onRemoveMultiple?: (symbols: string[]) => Promise<void>;
   onPortfolioRefresh?: () => void;
 }
 
@@ -54,7 +55,15 @@ function CombinedChartTooltip({ active, payload, label }: any) {
   );
 }
 
-function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: string) => void }) {
+function HoldingRow({
+  h, onRemove, selected, onToggleSelect, deleting,
+}: {
+  h: HoldingWithMetrics;
+  onRemove: (s: string) => void;
+  selected: boolean;
+  onToggleSelect: (s: string) => void;
+  deleting: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { data: analysis, loading: analysisLoading } = useAnalysis(expanded ? h.symbol : null, "sell");
   const sellResult = h.sell_result;
@@ -71,63 +80,81 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   return (
     <div className={clsx(
       "rounded-2xl border overflow-hidden transition-all",
-      shouldSell ? "border-red/20 bg-red/5" : "border-border/40 bg-white/[0.02]"
+      deleting ? "opacity-40 pointer-events-none" : "",
+      selected ? "border-green/40 bg-green/[0.04]" : shouldSell ? "border-red/20 bg-red/5" : "border-border/40 bg-white/[0.02]"
     )}>
-      <div className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
-        onClick={() => setExpanded(v => !v)}>
+      <div className="flex items-center gap-3 px-4 py-4">
+        {/* Checkbox */}
+        <button
+          onClick={e => { e.stopPropagation(); onToggleSelect(h.symbol); }}
+          className={clsx(
+            "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors",
+            selected ? "bg-green/20 border-green/50 text-green" : "border-border/50 text-transparent hover:border-green/30"
+          )}
+        >
+          {selected && <span className="text-[10px] font-bold leading-none">✓</span>}
+        </button>
 
-        {/* Avatar */}
-        <div className={clsx(
-          "w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-bold flex-shrink-0",
-          shouldSell
-            ? "bg-gradient-to-br from-red/30 to-red/10 text-red"
-            : "bg-gradient-to-br from-green/20 to-purple-500/10 text-green"
-        )}>
-          {h.symbol.slice(0, 2)}
-        </div>
+        {/* Rest of row — clickable to expand */}
+        <div className="flex flex-1 items-center gap-4 cursor-pointer hover:bg-white/[0.02] rounded-xl transition-colors -mx-1 px-1"
+          onClick={() => setExpanded(v => !v)}>
 
-        {/* Symbol + date */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-white font-semibold text-sm">{h.symbol}</p>
-            <span className={clsx(
-              "text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide",
-              shouldSell ? "bg-red/15 text-red" : "bg-green/10 text-green"
-            )}>
-              {shouldSell ? "SELL" : "HOLD"}
-            </span>
-            {brokerageSource && (
-              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                <Building2 size={9} />{brokerageSource}
-              </span>
-            )}
+          {/* Avatar */}
+          <div className={clsx(
+            "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold flex-shrink-0",
+            shouldSell
+              ? "bg-gradient-to-br from-red/30 to-red/10 text-red"
+              : "bg-gradient-to-br from-green/20 to-purple-500/10 text-green"
+          )}>
+            {h.symbol.slice(0, 2)}
           </div>
-          <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · {h.shares ?? 1} shares @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
-        </div>
 
-        {/* Price + gain */}
-        <div className="text-right">
-          <p className="text-white font-mono font-semibold">${h.current_price?.toFixed(2) ?? "—"}</p>
-          <p className={clsx("text-xs font-mono flex items-center justify-end gap-0.5", gainUp ? "text-green" : "text-red")}>
-            {gainUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-            {h.gain_pct != null ? `${gainUp ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—"}
-          </p>
-        </div>
+          {/* Symbol + date */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-white font-semibold text-sm">{h.symbol}</p>
+              <span className={clsx(
+                "text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide",
+                shouldSell ? "bg-red/15 text-red" : "bg-green/10 text-green"
+              )}>
+                {shouldSell ? "SELL" : "HOLD"}
+              </span>
+              {brokerageSource && (
+                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <Building2 size={9} />{brokerageSource}
+                </span>
+              )}
+            </div>
+            <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · {h.shares ?? 1} shares @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
+          </div>
 
-        {/* P&L */}
-        <div className="text-right w-28">
-          <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
-            {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
-          </p>
-          <p className="text-muted text-[10px]">unrealized P&L</p>
-        </div>
+          {/* Price + gain */}
+          <div className="text-right">
+            <p className="text-white font-mono font-semibold">${h.current_price?.toFixed(2) ?? "—"}</p>
+            <p className={clsx("text-xs font-mono flex items-center justify-end gap-0.5", gainUp ? "text-green" : "text-red")}>
+              {gainUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {h.gain_pct != null ? `${gainUp ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—"}
+            </p>
+          </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button onClick={e => { e.stopPropagation(); onRemove(h.symbol); }}
-            className="text-muted hover:text-red transition-colors p-1.5 rounded-lg hover:bg-red/10">
-            <Trash2 size={13} />
-          </button>
-          {expanded ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
+          {/* P&L */}
+          <div className="text-right w-28">
+            <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
+              {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
+            </p>
+            <p className="text-muted text-[10px]">unrealized P&L</p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={e => { e.stopPropagation(); onRemove(h.symbol); }}
+              disabled={deleting}
+              className="text-muted hover:text-red transition-colors p-1.5 rounded-lg hover:bg-red/10">
+              {deleting
+                ? <RefreshCw size={13} className="animate-spin text-red/50" />
+                : <Trash2 size={13} />}
+            </button>
+            {expanded ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
+          </div>
         </div>
       </div>
 
@@ -191,7 +218,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   );
 }
 
-export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPortfolioRefresh }: Props) {
+export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRemoveMultiple, onPortfolioRefresh }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
@@ -203,6 +230,10 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPor
   const [optimisticSymbol, setOptimisticSymbol] = useState<string | null>(null);
   const [showBrokerage, setShowBrokerage] = useState(false);
   const [positionSearch, setPositionSearch] = useState("");
+  // Multi-select state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deletingSymbols, setDeletingSymbols] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
   const avgGain = holdings.length
     ? holdings.reduce((s, h) => s + (h.gain_pct ?? 0), 0) / holdings.length : 0;
@@ -252,6 +283,44 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPor
         setShowAddForm(true); // reopen form on error
       })
       .finally(() => setSaving(false));
+  }
+
+  function toggleSelect(symbol: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol); else next.add(symbol);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const visible = filteredHoldings.map(h => h.symbol);
+    const allSelected = visible.every(s => selected.has(s));
+    setSelected(allSelected ? new Set() : new Set(visible));
+  }
+
+  async function handleSingleRemove(symbol: string) {
+    setDeletingSymbols(prev => new Set(prev).add(symbol));
+    try {
+      await onRemove(symbol);
+    } finally {
+      setDeletingSymbols(prev => { const n = new Set(prev); n.delete(symbol); return n; });
+      setSelected(prev => { const n = new Set(prev); n.delete(symbol); return n; });
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!selected.size || !onRemoveMultiple) return;
+    const symbols = [...selected];
+    setBulkDeleting(true);
+    setDeletingSymbols(new Set(symbols));
+    try {
+      await onRemoveMultiple(symbols);
+      setSelected(new Set());
+    } finally {
+      setBulkDeleting(false);
+      setDeletingSymbols(new Set());
+    }
   }
 
 
@@ -481,8 +550,39 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPor
             {/* Holdings list */}
             <div className="anim-fade-up" style={{ animationDelay: "220ms" }}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-white font-semibold">Positions</p>
-                <p className="text-muted text-xs">{holdings.length} holdings · click to expand</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-white font-semibold">Positions</p>
+                  {/* Select-all checkbox */}
+                  {filteredHoldings.length > 0 && !loading && (
+                    <button
+                      onClick={toggleSelectAll}
+                      className={clsx(
+                        "text-[11px] px-2 py-0.5 rounded-lg border transition-colors",
+                        filteredHoldings.every(h => selected.has(h.symbol))
+                          ? "bg-green/15 border-green/30 text-green"
+                          : "border-border/50 text-muted hover:text-white hover:border-border"
+                      )}
+                    >
+                      {filteredHoldings.every(h => selected.has(h.symbol)) ? "Deselect all" : "Select all"}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Bulk delete button */}
+                  {selected.size > 0 && (
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleting}
+                      className="flex items-center gap-1.5 text-xs text-red/80 hover:text-red bg-red/5 hover:bg-red/10 border border-red/20 px-3 py-1.5 rounded-xl transition-colors"
+                    >
+                      {bulkDeleting
+                        ? <RefreshCw size={11} className="animate-spin" />
+                        : <Trash2 size={11} />}
+                      Remove {selected.size} selected
+                    </button>
+                  )}
+                  <p className="text-muted text-xs">{holdings.length} holdings · click to expand</p>
+                </div>
               </div>
               {/* Search bar */}
               <div className="relative mb-3">
@@ -520,7 +620,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPor
                 ) : filteredHoldings.length === 0 && positionSearch ? (
                   <div className="text-muted text-sm text-center py-8">No positions match "{positionSearch}"</div>
                 ) : (
-                  filteredHoldings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
+                  filteredHoldings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={handleSingleRemove} selected={selected.has(h.symbol)} onToggleSelect={toggleSelect} deleting={deletingSymbols.has(h.symbol)} />)
                 )}
                 {/* Optimistic placeholder while new holding is loading */}
                 {optimisticSymbol && !holdings.find(h => h.symbol === optimisticSymbol) && (

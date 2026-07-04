@@ -117,10 +117,23 @@ export function usePortfolio() {
 
   const removeHolding = useCallback(async (symbol: string) => {
     await apiFetch(`/portfolio/${symbol}`, { method: "DELETE" });
-    await load();
+    // Optimistically remove from local state immediately, then reload in background
+    setData(prev => prev.filter((h: any) => h.symbol !== symbol));
+    load(); // background refresh (don't await — don't block UI)
   }, [load]);
 
-  return { data, loading, refresh: load, addHolding, removeHolding, addError };
+  const removeHoldings = useCallback(async (symbols: string[]) => {
+    if (!symbols.length) return;
+    // Optimistically remove all from local state immediately
+    setData(prev => prev.filter((h: any) => !symbols.includes(h.symbol)));
+    // Fire all deletes in parallel
+    await Promise.allSettled(
+      symbols.map(s => apiFetch(`/portfolio/${s}`, { method: "DELETE" }))
+    );
+    load(); // background refresh
+  }, [load]);
+
+  return { data, loading, refresh: load, addHolding, removeHolding, removeHoldings, addError };
 }
 
 export function useAnalysis(symbol: string | null, action: string | null) {

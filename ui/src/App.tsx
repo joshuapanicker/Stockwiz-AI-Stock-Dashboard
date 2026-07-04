@@ -56,16 +56,19 @@ const NAV_ITEMS: { id: Tab; icon: React.ReactNode; label: string }[] = [
   { id: "chat", icon: <MessageSquare size={16} />, label: "Market Chat" },
 ];
 
-function NavBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+function NavBar({ tab, setTab, settingsOpen, onCloseSettings }: {
+  tab: Tab; setTab: (t: Tab) => void;
+  settingsOpen: boolean; onCloseSettings: () => void;
+}) {
   return (
     <div className="fixed top-[6px] left-1/2 -translate-x-1/2 z-50">
       <div className="flex items-center gap-0.5 px-1.5 py-[3px] bg-card/90 backdrop-blur-md border border-border/60 rounded-xl shadow-2xl">
         {NAV_ITEMS.map(item => (
-          <button key={item.id} onClick={() => setTab(item.id)}
+          <button key={item.id} onClick={() => { setTab(item.id); if (settingsOpen) onCloseSettings(); }}
             title={item.label}
             className={clsx(
               "w-9 h-8 flex items-center justify-center rounded-lg text-xs font-medium transition-all",
-              tab === item.id
+              !settingsOpen && tab === item.id
                 ? item.id === "chat"
                   ? "bg-purple-500/20 text-purple-400"
                   : "bg-green/15 text-green"
@@ -93,6 +96,26 @@ export default function App() {
     setSettingsOpen(true);
   }
 
+  async function syncBrokerage() {
+    try {
+      const { apiFetch } = await import("./hooks/useApi");
+      const data = await apiFetch<{ connected: boolean; holdings: any[] }>("/plaid/holdings");
+      if (data.connected && data.holdings.length > 0) {
+        await Promise.allSettled(
+          data.holdings.map((h: any) =>
+            addHolding(
+              h.symbol,
+              new Date().toISOString().slice(0, 10),
+              h.cost_basis != null && h.quantity > 0 ? h.cost_basis / h.quantity : undefined,
+              h.quantity,
+              "Synced from brokerage"
+            )
+          )
+        );
+      }
+    } catch {}
+  }
+
   const rightColRef = useRef<HTMLDivElement>(null);
 
   const onLRDivider = makeDragger(setRightWidth, () => rightWidth, "x",
@@ -100,7 +123,7 @@ export default function App() {
 
   const { data: screened, loading: screenLoading } = useScreener();
   const market = useMarket();
-  const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding } = usePortfolio();
+  const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding, removeHoldings, refresh: refreshPortfolio } = usePortfolio();
 
   const activeSymbol = selectedSymbol;
   const { data: featuredHistory } = usePriceHistory(activeSymbol, "1y");
@@ -163,10 +186,11 @@ export default function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         initialTab={settingsTab}
+        onPortfolioSync={refreshPortfolio}
       />
 
       {/* ── Floating top nav — fixed, same height as search bar ── */}
-      <NavBar tab={tab} setTab={setTab} />
+      <NavBar tab={tab} setTab={setTab} settingsOpen={settingsOpen} onCloseSettings={() => setSettingsOpen(false)} />
 
       {/* ── Tab content — full height, nav floats above ── */}
       <div className="flex-1 min-h-0 flex flex-col">
@@ -294,6 +318,8 @@ export default function App() {
               loading={portfolioLoading}
               onAdd={addHolding}
               onRemove={removeHolding}
+              onRemoveMultiple={removeHoldings}
+              onPortfolioRefresh={refreshPortfolio}
             />
           </div>
         )}
