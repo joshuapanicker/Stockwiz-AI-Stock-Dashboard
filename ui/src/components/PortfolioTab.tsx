@@ -497,7 +497,26 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPor
               </div>
               <div className="space-y-2">
                 {loading ? (
-                  <div className="text-muted text-sm text-center py-12">Loading...</div>
+                  // Skeleton rows while portfolio loads
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="rounded-2xl border border-border/40 bg-white/[0.02] overflow-hidden">
+                      <div className="flex items-center gap-4 px-5 py-4">
+                        <div className="w-11 h-11 rounded-2xl bg-white/5 animate-pulse flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 bg-white/5 rounded animate-pulse w-24" />
+                          <div className="h-2.5 bg-white/5 rounded animate-pulse w-40" />
+                        </div>
+                        <div className="space-y-2 text-right">
+                          <div className="h-3 bg-white/5 rounded animate-pulse w-16 ml-auto" />
+                          <div className="h-2.5 bg-white/5 rounded animate-pulse w-12 ml-auto" />
+                        </div>
+                        <div className="w-28 space-y-2">
+                          <div className="h-3 bg-white/5 rounded animate-pulse" />
+                          <div className="h-2.5 bg-white/5 rounded animate-pulse w-20" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 ) : filteredHoldings.length === 0 && positionSearch ? (
                   <div className="text-muted text-sm text-center py-8">No positions match "{positionSearch}"</div>
                 ) : (
