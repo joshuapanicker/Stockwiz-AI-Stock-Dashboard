@@ -60,12 +60,17 @@ def create_link_token(user_id: str) -> str:
     return response["link_token"]
 
 
-def exchange_public_token(public_token: str) -> str:
-    """Exchange a public token for a persistent access token."""
+def exchange_public_token(public_token: str) -> dict:
+    """Exchange a public token for a persistent access token.
+    Returns dict with access_token and item_id.
+    """
     client = get_plaid_client()
     request = ItemPublicTokenExchangeRequest(public_token=public_token)
     response = client.item_public_token_exchange(request)
-    return response["access_token"]
+    return {
+        "access_token": response["access_token"],
+        "item_id": response["item_id"],
+    }
 
 
 def get_holdings(access_token: str) -> list[dict]:
