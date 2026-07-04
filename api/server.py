@@ -402,13 +402,24 @@ def plaid_status(user_id: str | None = Depends(get_optional_user)):
 
 
 @app.delete("/api/plaid/disconnect/{connection_id}")
-def plaid_disconnect(connection_id: str, user_id: str | None = Depends(get_optional_user)):
-    """Remove a specific Plaid connection by its UUID."""
+def plaid_disconnect(connection_id: str, remove_holdings: bool = False,
+                     user_id: str | None = Depends(get_optional_user)):
+    """Remove a specific Plaid connection by its UUID.
+    If remove_holdings=true, also delete all portfolio holdings synced from that institution.
+    """
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    from core.plaid_client import delete_plaid_connection
+    from core.plaid_client import delete_plaid_connection, get_plaid_tokens
+    # Grab institution name before deleting so we can match holdings
+    removed_count = 0
+    if remove_holdings:
+        connections = get_plaid_tokens(user_id)
+        conn = next((c for c in connections if c["id"] == connection_id), None)
+        if conn and conn.get("institution_name"):
+            from core.db import delete_holdings_by_source
+            removed_count = delete_holdings_by_source(user_id, conn["institution_name"])
     delete_plaid_connection(user_id, connection_id)
-    return {"disconnected": connection_id}
+    return {"disconnected": connection_id, "holdings_removed": removed_count}
 
 
 @app.delete("/api/plaid/disconnect")
@@ -419,6 +430,20 @@ def plaid_disconnect_all(user_id: str | None = Depends(get_optional_user)):
     from core.plaid_client import delete_plaid_connection
     delete_plaid_connection(user_id)
     return {"disconnected": True}
+
+
+# ── Portfolio source cleanup ──────────────────────────────────────────────
+
+@app.delete("/api/portfolio/source/{source}")
+def remove_holdings_by_source(source: str, user_id: str | None = Depends(get_optional_user)):
+    """Delete all portfolio holdings synced from a given source (institution name).
+    Used when a brokerage has already been disconnected but holdings remain.
+    """
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.db import delete_holdings_by_source
+    removed = delete_holdings_by_source(user_id, source)
+    return {"source": source, "removed": removed}
 
 
 # ── Symbol search (typeahead) ─────────────────────────────────────────────
