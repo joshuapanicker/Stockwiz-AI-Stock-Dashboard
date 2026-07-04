@@ -302,10 +302,13 @@ def add_to_portfolio(req: AddHoldingRequest, user_id: str | None = Depends(get_o
     return file_add_holding(req.symbol, req.buy_date, buy_price, req.notes, req.shares)
 
 
-@app.delete("/api/portfolio/{symbol}")
+@app.delete("/api/portfolio/{symbol:path}")
 def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optional_user)):
     from core.db import delete_holding as db_delete
     from core.portfolio import remove_holding as file_remove
+    # URL-decode in case the symbol contains encoded special chars
+    from urllib.parse import unquote
+    symbol = unquote(symbol)
     if user_id:
         if not db_delete(user_id, symbol):
             raise HTTPException(status_code=404, detail=f"{symbol} not found")

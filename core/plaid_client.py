@@ -85,13 +85,26 @@ def get_holdings(access_token: str) -> list[dict]:
     # Build security lookup: security_id → ticker_symbol
     securities = {s["security_id"]: s for s in response["securities"]}
 
+    # Security types to exclude — only keep equities and ETFs
+    EQUITY_TYPES = {"equity", "etf"}
+
     holdings = []
     for h in response["holdings"]:
         security = securities.get(h["security_id"], {})
-        ticker = security.get("ticker_symbol") or security.get("name", "UNKNOWN")
+        sec_type = (security.get("type") or "").lower()
+        ticker = (security.get("ticker_symbol") or "").strip()
 
-        # Skip non-equity securities (bonds, cash, etc.) unless they have a ticker
-        if not ticker or ticker in ("CUR:USD", "USD"):
+        # Skip non-equity types (fixed income, mutual fund, cash, derivative, etc.)
+        if sec_type and sec_type not in EQUITY_TYPES:
+            continue
+
+        # Skip cash / currency positions
+        if not ticker or ticker in ("CUR:USD", "USD", "CASH"):
+            continue
+
+        # Skip if the ticker looks like a full security name (contains spaces)
+        # — these are bonds/T-bills that slipped through without a proper type tag
+        if " " in ticker or len(ticker) > 10:
             continue
 
         holdings.append({
@@ -101,7 +114,7 @@ def get_holdings(access_token: str) -> list[dict]:
             "current_value": float(h.get("institution_value", 0)),
             "institution_price": float(h.get("institution_price", 0)),
             "security_name": security.get("name", ticker),
-            "security_type": security.get("type", "equity"),
+            "security_type": sec_type or "equity",
         })
 
     return holdings
