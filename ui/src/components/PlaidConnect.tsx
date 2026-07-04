@@ -40,7 +40,7 @@ export default function PlaidConnect({ onHoldingsSynced }: Props) {
   useEffect(() => {
     apiFetch<PlaidStatus>("/plaid/status")
       .then(s => setStatus(s))
-      .catch(() => setStatus({ connected: false }));
+      .catch((e) => { console.error("Plaid status error:", e); setStatus({ connected: false }); });
   }, []);
 
   // Get link token when user wants to connect
@@ -49,6 +49,7 @@ export default function PlaidConnect({ onHoldingsSynced }: Props) {
     setError(null);
     try {
       const { link_token } = await apiFetch<{ link_token: string }>("/plaid/link-token", { method: "POST" });
+      if (!link_token) throw new Error("No link token returned");
       setLinkToken(link_token);
     } catch (e: any) {
       setError(e.message ?? "Failed to initialize Plaid");
@@ -79,7 +80,7 @@ export default function PlaidConnect({ onHoldingsSynced }: Props) {
   }, []);
 
   const { open: openPlaidLink, ready } = usePlaidLink({
-    token: linkToken ?? "",
+    token: linkToken ?? null,
     onSuccess,
     onExit: () => setLinkToken(null),
   });
