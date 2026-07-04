@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 interface Props {
   open: boolean;
   onClose: () => void;
-  onOpenSettings: (tab?: "profile" | "criteria" | "notifications" | "security") => void;
+  onOpenSettings: (tab?: "profile" | "criteria" | "notifications" | "brokerage" | "security") => void;
   portfolioStats?: {
     holdings: number;
     netPnl: number | null;

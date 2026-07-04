@@ -305,6 +305,83 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
     return {"removed": symbol}
 
 
+# ── Plaid (brokerage sync) ────────────────────────────────────────────────
+
+@app.post("/api/plaid/link-token")
+def plaid_link_token(user_id: str | None = Depends(get_optional_user)):
+    """Create a Plaid Link token to initialize the Link flow."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.plaid_client import create_link_token
+    try:
+        token = create_link_token(user_id)
+        return {"link_token": token}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PlaidExchangeRequest(BaseModel):
+    public_token: str
+    institution_name: str = ""
+
+
+@app.post("/api/plaid/exchange")
+def plaid_exchange(req: PlaidExchangeRequest, user_id: str | None = Depends(get_optional_user)):
+    """Exchange public token for access token and store it."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.plaid_client import exchange_public_token, save_plaid_token
+    try:
+        access_token = exchange_public_token(req.public_token)
+        save_plaid_token(user_id, access_token, req.institution_name)
+        return {"connected": True, "institution": req.institution_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/plaid/holdings")
+def plaid_holdings(user_id: str | None = Depends(get_optional_user)):
+    """Fetch real brokerage holdings from connected Plaid account."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.plaid_client import get_plaid_token, get_holdings
+    access_token = get_plaid_token(user_id)
+    if not access_token:
+        return {"connected": False, "holdings": []}
+    try:
+        holdings = get_holdings(access_token)
+        return {"connected": True, "holdings": holdings}
+    except Exception as e:
+        return {"connected": False, "holdings": [], "error": str(e)}
+
+
+@app.get("/api/plaid/status")
+def plaid_status(user_id: str | None = Depends(get_optional_user)):
+    """Check if user has a connected Plaid account."""
+    if not user_id:
+        return {"connected": False}
+    from core.plaid_client import get_plaid_token
+    from core.db import get_client
+    res = (get_client().table("plaid_connections")
+           .select("institution_name, updated_at")
+           .eq("user_id", user_id)
+           .maybe_single()
+           .execute())
+    if res.data:
+        return {"connected": True, "institution": res.data.get("institution_name", ""), "updated_at": res.data.get("updated_at")}
+    return {"connected": False}
+
+
+@app.delete("/api/plaid/disconnect")
+def plaid_disconnect(user_id: str | None = Depends(get_optional_user)):
+    """Remove Plaid connection for user."""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    from core.plaid_client import delete_plaid_connection
+    delete_plaid_connection(user_id)
+    return {"disconnected": True}
+
+
 # ── Symbol search (typeahead) ─────────────────────────────────────────────
 
 @app.get("/api/search")
