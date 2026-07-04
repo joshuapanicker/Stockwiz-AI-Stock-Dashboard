@@ -116,7 +116,7 @@ export function usePortfolio() {
   }, [load]);
 
   const removeHolding = useCallback(async (symbol: string) => {
-    await apiFetch(`/portfolio/${symbol}`, { method: "DELETE" });
+    await apiFetch(`/portfolio/${encodeURIComponent(symbol)}`, { method: "DELETE" });
     // Optimistically remove from local state immediately, then reload in background
     setData(prev => prev.filter((h: any) => h.symbol !== symbol));
     load(); // background refresh (don't await — don't block UI)
@@ -128,7 +128,7 @@ export function usePortfolio() {
     setData(prev => prev.filter((h: any) => !symbols.includes(h.symbol)));
     // Fire all deletes in parallel
     await Promise.allSettled(
-      symbols.map(s => apiFetch(`/portfolio/${s}`, { method: "DELETE" }))
+      symbols.map(s => apiFetch(`/portfolio/${encodeURIComponent(s)}`, { method: "DELETE" }))
     );
     load(); // background refresh
   }, [load]);
