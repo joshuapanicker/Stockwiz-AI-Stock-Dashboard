@@ -12,6 +12,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialTab?: SettingsTab;
+  onPortfolioSync?: () => void | Promise<void>;
 }
 
 const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
@@ -153,7 +154,7 @@ function ProfileEditor() {
     </div>
   );
 }
-export default function SettingsPage({ open, onClose, initialTab = "criteria" }: Props) {
+export default function SettingsPage({ open, onClose, initialTab = "criteria", onPortfolioSync }: Props) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [criteria, setCriteria] = useState<CriteriaConfig | null>(null);
   const [loadingCriteria, setLoadingCriteria] = useState(false);
@@ -276,7 +277,7 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria" }:
                   Your credentials are never stored — Plaid handles authentication directly with your bank.
                 </p>
               </div>
-              <PlaidConnect />
+              <PlaidConnect onHoldingsSynced={() => onPortfolioSync?.()} />
             </div>
           )}
 
