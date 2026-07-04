@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2 } from "lucide-react";
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
 import AlertsEditor from "./AlertsEditor";
+import PlaidConnect from "./PlaidConnect";
 import { apiFetch, useProfile } from "../hooks/useApi";
 
-type SettingsTab = "profile" | "criteria" | "notifications" | "security";
+type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security";
 
 interface Props {
   open: boolean;
@@ -16,7 +17,8 @@ interface Props {
 const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "profile",       label: "Investment Profile", icon: <User size={14} /> },
   { id: "criteria",      label: "Screening Criteria", icon: <SlidersHorizontal size={14} /> },
-  { id: "notifications", label: "Notifications",      icon: <Bell size={14} /> },
+  { id: "notifications", label: "Alerts",             icon: <Bell size={14} /> },
+  { id: "brokerage",     label: "Brokerage",          icon: <Building2 size={14} /> },
   { id: "security",      label: "Security",           icon: <Shield size={14} /> },
 ];
 
@@ -261,6 +263,20 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria" }:
                 </p>
               </div>
               <AlertsEditor />
+            </div>
+          )}
+
+          {/* ── Brokerage ── */}
+          {activeTab === "brokerage" && (
+            <div className="max-w-2xl">
+              <div className="mb-6">
+                <h2 className="text-white font-bold text-xl">Brokerage Connection</h2>
+                <p className="text-muted text-sm mt-1">
+                  Connect your brokerage account to automatically sync your real holdings into StockWiz.
+                  Your credentials are never stored — Plaid handles authentication directly with your bank.
+                </p>
+              </div>
+              <PlaidConnect />
             </div>
           )}
 
