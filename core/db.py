@@ -56,6 +56,20 @@ def delete_holding(user_id: str, symbol: str) -> bool:
     return bool(res.data)
 
 
+def delete_holdings_by_source(user_id: str, source: str) -> int:
+    """
+    Delete all portfolio holdings whose notes field contains `source`.
+    Used to clean up Plaid-synced holdings when disconnecting a brokerage.
+    Returns number of rows deleted.
+    """
+    res = (get_client().table("portfolios")
+           .delete()
+           .eq("user_id", user_id)
+           .ilike("notes", f"%{source}%")
+           .execute())
+    return len(res.data) if res.data else 0
+
+
 # ── Criteria ───────────────────────────────────────────────────────────────
 
 def get_user_criteria(user_id: str) -> dict | None:

@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw, Search, Building2 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, PieChart, Pie, Cell
 } from "recharts";
 import PortfolioChart from "./PortfolioChart";
 import SymbolSearch from "./SymbolSearch";
+import PlaidConnect from "./PlaidConnect";
 import { useAnalysis, useUniverseSignals } from "../hooks/useApi";
 import type { HoldingWithMetrics } from "../types";
 
@@ -15,6 +16,7 @@ interface Props {
   loading: boolean;
   onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => Promise<void>;
   onRemove: (symbol: string) => void;
+  onPortfolioRefresh?: () => void;
 }
 
 // Combined portfolio value chart — merges all holdings' history by date
@@ -59,6 +61,13 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   const shouldSell = sellResult?.passed ?? false;
   const gainUp = (h.gain_pct ?? 0) >= 0;
 
+  // Parse institution name from notes, e.g. "Synced from Charles Schwab"
+  const brokerageSource = useMemo(() => {
+    if (!h.notes) return null;
+    const m = h.notes.match(/^Synced from (.+)$/i);
+    return m ? m[1] : null;
+  }, [h.notes]);
+
   return (
     <div className={clsx(
       "rounded-2xl border overflow-hidden transition-all",
@@ -79,7 +88,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
 
         {/* Symbol + date */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-semibold text-sm">{h.symbol}</p>
             <span className={clsx(
               "text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide",
@@ -87,6 +96,11 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
             )}>
               {shouldSell ? "SELL" : "HOLD"}
             </span>
+            {brokerageSource && (
+              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                <Building2 size={9} />{brokerageSource}
+              </span>
+            )}
           </div>
           <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · {h.shares ?? 1} shares @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
         </div>
@@ -177,7 +191,7 @@ function HoldingRow({ h, onRemove }: { h: HoldingWithMetrics; onRemove: (s: stri
   );
 }
 
-export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Props) {
+export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onPortfolioRefresh }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
@@ -187,6 +201,8 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [optimisticSymbol, setOptimisticSymbol] = useState<string | null>(null);
+  const [showBrokerage, setShowBrokerage] = useState(false);
+  const [positionSearch, setPositionSearch] = useState("");
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
   const avgGain = holdings.length
     ? holdings.reduce((s, h) => s + (h.gain_pct ?? 0), 0) / holdings.length : 0;
@@ -198,6 +214,16 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
   const { data: signals, loading: signalsLoading, refresh: refreshSignals } = useUniverseSignals();
   const buySignals = signals.filter((s: any) => s.classification === "buy");
   const watchSignals = signals.filter((s: any) => s.classification === "watch");
+
+  // Filtered holdings for position search
+  const filteredHoldings = useMemo(() => {
+    const q = positionSearch.trim().toUpperCase();
+    if (!q) return holdings;
+    return holdings.filter(h =>
+      h.symbol.includes(q) ||
+      (h.notes?.toUpperCase().includes(q))
+    );
+  }, [holdings, positionSearch]);
 
   // Allocation data for donut
   const allocationData = useMemo(() => {
@@ -270,11 +296,13 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
             </p>
           </div>
 
-          <button onClick={() => setShowAddForm(v => !v)}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-border/60 text-white rounded-2xl px-5 py-2.5 text-sm font-medium transition-all hover:border-green/30">
-            <Plus size={15} />
-            Add Stock
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowAddForm(v => !v)}
+              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-border/60 text-white rounded-2xl px-5 py-2.5 text-sm font-medium transition-all hover:border-green/30">
+              <Plus size={15} />
+              Add Stock
+            </button>
+          </div>
         </div>
 
         {/* Add form */}
@@ -321,6 +349,28 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
             )}
           </div>
         )}
+
+        {/* Brokerage connection panel */}
+        <div className="relative mt-4">
+          <button onClick={() => setShowBrokerage(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3 bg-card2/60 hover:bg-card2 border border-border/40 rounded-2xl text-sm transition-colors text-left">
+            <div className="flex items-center gap-2">
+              <RefreshCw size={13} className="text-green flex-shrink-0" />
+              <span className="text-white font-medium">Brokerage Connection</span>
+              <span className="text-muted text-xs hidden sm:inline">· connect &amp; sync your real holdings</span>
+            </div>
+            {showBrokerage ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
+          </button>
+          {showBrokerage && (
+            <div className="mt-2 bg-card2 border border-border/40 rounded-2xl p-5">
+              <PlaidConnect
+                onHoldingsSynced={() => onPortfolioRefresh?.()}
+                onHoldingsRemoved={() => onPortfolioRefresh?.()}
+              />
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* ── Two-column split — always shown ── */}
@@ -341,11 +391,12 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
             <>
             {/* Charts row */}
             <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
-              <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5">
-                <div className="mb-4">
+              <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col">
+                <div className="mb-4 flex-shrink-0">
                   <p className="text-white font-semibold text-sm">Portfolio Performance</p>
                   <p className="text-muted text-xs mt-0.5">Combined value over time</p>
                 </div>
+                <div className="flex-1 min-h-0" style={{ minHeight: 160 }}>
                 {combinedHistory.length > 1 ? (
                   <ResponsiveContainer width="100%" height={160}>
                     <AreaChart data={combinedHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -368,14 +419,15 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                 ) : (
                   <div className="chart-skeleton h-[160px]" />
                 )}
+                </div>{/* end flex-1 */}
               </div>
 
-              <div className="bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col">
+              <div className="bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col" style={{ minHeight: 0 }}>
                 <p className="text-white font-semibold text-sm mb-1">Allocation</p>
                 <p className="text-muted text-xs mb-3">By current value</p>
                 {allocationData.length > 0 ? (
                   <>
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center flex-shrink-0">
                       <PieChart width={120} height={120}>
                         <Pie data={allocationData} cx={55} cy={55} innerRadius={34} outerRadius={55}
                           paddingAngle={3} dataKey="value">
@@ -386,7 +438,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                         <Tooltip content={<DonutTooltip />} />
                       </PieChart>
                     </div>
-                    <div className="space-y-1 mt-2">
+                    <div className="space-y-1 mt-2 overflow-y-auto max-h-32">
                       {allocationData.map((d, i) => (
                         <div key={d.name} className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-1.5">
@@ -432,11 +484,24 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove }: Pro
                 <p className="text-white font-semibold">Positions</p>
                 <p className="text-muted text-xs">{holdings.length} holdings · click to expand</p>
               </div>
+              {/* Search bar */}
+              <div className="relative mb-3">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                <input
+                  type="text"
+                  value={positionSearch}
+                  onChange={e => setPositionSearch(e.target.value)}
+                  placeholder="Search positions…"
+                  className="w-full bg-card border border-border/50 rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder:text-muted focus:outline-none focus:border-green/40"
+                />
+              </div>
               <div className="space-y-2">
                 {loading ? (
                   <div className="text-muted text-sm text-center py-12">Loading...</div>
+                ) : filteredHoldings.length === 0 && positionSearch ? (
+                  <div className="text-muted text-sm text-center py-8">No positions match "{positionSearch}"</div>
                 ) : (
-                  holdings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
+                  filteredHoldings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={onRemove} />)
                 )}
                 {/* Optimistic placeholder while new holding is loading */}
                 {optimisticSymbol && !holdings.find(h => h.symbol === optimisticSymbol) && (
