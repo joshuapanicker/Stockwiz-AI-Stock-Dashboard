@@ -123,7 +123,7 @@ export default function App() {
 
   const { data: screened, loading: screenLoading } = useScreener();
   const market = useMarket();
-  const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding, removeHoldings, refresh: refreshPortfolio } = usePortfolio();
+  const { data: portfolio, loading: portfolioLoading, addHolding, removeHolding, removeHoldings, sellHolding, refresh: refreshPortfolio } = usePortfolio();
 
   const activeSymbol = selectedSymbol;
   const { data: featuredHistory } = usePriceHistory(activeSymbol, "1y");
@@ -319,6 +319,7 @@ export default function App() {
               onAdd={addHolding}
               onRemove={removeHolding}
               onRemoveMultiple={removeHoldings}
+              onSell={sellHolding}
               onPortfolioRefresh={refreshPortfolio}
             />
           </div>
