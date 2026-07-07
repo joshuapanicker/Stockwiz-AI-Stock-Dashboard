@@ -249,6 +249,7 @@ async def chat_endpoint(symbol: str, req: ChatRequest,
 
 @app.get("/api/portfolio")
 def portfolio(user_id: str | None = Depends(get_optional_user)):
+    from concurrent.futures import ThreadPoolExecutor
     from core.db import get_holdings as db_get_holdings
     from core.portfolio import get_holdings as file_get_holdings
     # Use Supabase if authenticated, fallback to file for unauthenticated
@@ -257,8 +258,7 @@ def portfolio(user_id: str | None = Depends(get_optional_user)):
     else:
         holdings = file_get_holdings()
     market = get_market_context()
-    enriched = []
-    for h in holdings:
+    def enrich_holding(h):
         symbol = h["symbol"]
         try:
             metrics = get_stock_metrics(symbol)
@@ -272,13 +272,18 @@ def portfolio(user_id: str | None = Depends(get_optional_user)):
             metrics = None; current = None
             gain = {"gain_pct": None, "gain_abs": None, "total_value": None}
             sell_result = None; hist = []
-        enriched.append({**h, "current_price": current,
-                         "gain_pct": gain.get("gain_pct"),
-                         "gain_abs": gain.get("gain_abs"),
-                         "total_value": gain.get("total_value"),
-                         "sell_result": sell_result,
-                         "metrics": metrics, "history": hist})
-    return enriched
+        return {**h, "current_price": current,
+                "gain_pct": gain.get("gain_pct"),
+                "gain_abs": gain.get("gain_abs"),
+                "total_value": gain.get("total_value"),
+                "sell_result": sell_result,
+                "metrics": metrics, "history": hist}
+
+    # Network-bound market lookups used to run one holding at a time. Fetching
+    # them concurrently makes first portfolio load scale with the slowest
+    # symbol rather than the sum of every symbol's latency.
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(holdings)))) as pool:
+        return list(pool.map(enrich_holding, holdings))
 
 
 class AddHoldingRequest(BaseModel):
