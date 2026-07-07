@@ -56,6 +56,40 @@ def delete_holding(user_id: str, symbol: str) -> bool:
     return bool(res.data)
 
 
+# ── Sold positions ─────────────────────────────────────────────────────────
+
+def record_sale(user_id: str, symbol: str, sell_date: str,
+                sell_price: float, shares: float,
+                buy_price: float | None, buy_date: str) -> dict:
+    """Record a completed sale in sold_positions and remove from portfolios."""
+    realized_gain = round((sell_price - (buy_price or 0)) * shares, 4) if buy_price else None
+    realized_pct  = round((sell_price / buy_price - 1) * 100, 4) if buy_price and buy_price > 0 else None
+    row = {
+        "user_id": user_id,
+        "symbol": symbol.upper(),
+        "sell_date": sell_date,
+        "sell_price": sell_price,
+        "shares": shares,
+        "buy_price": buy_price,
+        "buy_date": buy_date,
+        "realized_gain": realized_gain,
+        "realized_pct": realized_pct,
+    }
+    get_client().table("sold_positions").insert(row).execute()
+    # Remove from active holdings
+    delete_holding(user_id, symbol)
+    return row
+
+
+def get_sold_positions(user_id: str) -> list[dict]:
+    res = (get_client().table("sold_positions")
+           .select("*")
+           .eq("user_id", user_id)
+           .order("sell_date", desc=True)
+           .execute())
+    return res.data or []
+
+
 def delete_holdings_by_source(user_id: str, source: str) -> int:
     """
     Delete all portfolio holdings whose notes field contains `source`.

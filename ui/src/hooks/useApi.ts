@@ -133,7 +133,24 @@ export function usePortfolio() {
     load(); // background refresh
   }, [load]);
 
-  return { data, loading, refresh: load, addHolding, removeHolding, removeHoldings, addError };
+  const sellHolding = useCallback(async (symbol: string, sellPrice: number, sellDate?: string) => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.access_token) {
+      setAuthToken(sessionData.session.access_token);
+    }
+    await apiFetch(`/portfolio/${encodeURIComponent(symbol)}/sell`, {
+      method: "POST",
+      body: JSON.stringify({
+        sell_price: sellPrice,
+        sell_date: sellDate ?? new Date().toISOString().slice(0, 10),
+      }),
+    });
+    // Remove from local active holdings immediately
+    setData(prev => prev.filter((h: any) => h.symbol !== symbol));
+    load();
+  }, [load]);
+
+  return { data, loading, refresh: load, addHolding, removeHolding, removeHoldings, sellHolding, addError };
 }
 
 export function useAnalysis(symbol: string | null, action: string | null) {
@@ -294,3 +311,23 @@ export function useUniverseSectors() {
 }
 
 export { apiFetch };
+
+export function useSoldPositions() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.access_token) {
+      setAuthToken(sessionData.session.access_token);
+    }
+    apiFetch<any[]>("/portfolio/sold")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => { setData([]); setLoading(false); });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  return { data, loading, refresh: load };
+}

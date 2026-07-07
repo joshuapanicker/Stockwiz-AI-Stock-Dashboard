@@ -323,6 +323,59 @@ def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optiona
     return {"removed": symbol}
 
 
+class SellHoldingRequest(BaseModel):
+    sell_price: float
+    sell_date: str | None = None  # defaults to today
+
+
+@app.post("/api/portfolio/{symbol}/sell")
+def sell_holding(
+    symbol: str,
+    req: SellHoldingRequest,
+    user_id: str | None = Depends(get_optional_user),
+):
+    """Record a sale, capture realized P&L, and remove the holding."""
+    from urllib.parse import unquote
+    from datetime import date
+    from core.db import record_sale, get_holdings as db_get_holdings
+    from core.portfolio import get_holding as file_get_holding, remove_holding as file_remove
+
+    symbol = unquote(symbol).upper()
+    sell_date = req.sell_date or date.today().isoformat()
+
+    if user_id:
+        holdings = db_get_holdings(user_id)
+        holding = next((h for h in holdings if h["symbol"] == symbol), None)
+        if not holding:
+            raise HTTPException(status_code=404, detail=f"{symbol} not found in portfolio")
+        return record_sale(
+            user_id=user_id,
+            symbol=symbol,
+            sell_date=sell_date,
+            sell_price=req.sell_price,
+            shares=float(holding.get("shares") or 1),
+            buy_price=holding.get("buy_price"),
+            buy_date=holding.get("buy_date", ""),
+        )
+    else:
+        # Unauthenticated / dev fallback — just delete
+        from core.portfolio import get_holding as file_get_holding, remove_holding as file_remove
+        holding = file_get_holding(symbol)
+        if not holding:
+            raise HTTPException(status_code=404, detail=f"{symbol} not found")
+        file_remove(symbol)
+        return {"symbol": symbol, "sell_price": req.sell_price, "sell_date": sell_date}
+
+
+@app.get("/api/portfolio/sold")
+def get_sold_positions(user_id: str | None = Depends(get_optional_user)):
+    """Return the user's completed trade history."""
+    if not user_id:
+        return []  # no history for unauthenticated users
+    from core.db import get_sold_positions as db_get_sold
+    return db_get_sold(user_id)
+
+
 # ── Plaid (brokerage sync) ────────────────────────────────────────────────
 
 @app.post("/api/plaid/link-token")

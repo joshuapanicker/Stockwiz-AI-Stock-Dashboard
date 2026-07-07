@@ -1,14 +1,14 @@
 import { useState, useMemo } from "react";
 import clsx from "clsx";
-import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw, Search, Building2 } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw, Search, Building2, DollarSign, History } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, PieChart, Pie, Cell
+  PieChart, Pie, Cell
 } from "recharts";
 import PortfolioChart from "./PortfolioChart";
 import SymbolSearch from "./SymbolSearch";
 import PlaidConnect from "./PlaidConnect";
-import { useAnalysis, useUniverseSignals } from "../hooks/useApi";
+import { useAnalysis, useUniverseSignals, useSoldPositions } from "../hooks/useApi";
 import type { HoldingWithMetrics } from "../types";
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
   onAdd: (symbol: string, buyDate: string, buyPrice?: number, shares?: number, notes?: string) => Promise<void>;
   onRemove: (symbol: string) => void;
   onRemoveMultiple?: (symbols: string[]) => Promise<void>;
+  onSell?: (symbol: string, sellPrice: number, sellDate?: string) => Promise<void>;
   onPortfolioRefresh?: () => void;
 }
 
@@ -56,26 +57,223 @@ function CombinedChartTooltip({ active, payload, label }: any) {
 }
 
 function HoldingRow({
-  h, onRemove, selected, onToggleSelect, deleting,
+  h, onRemove, onSell, selected, onToggleSelect, deleting,
 }: {
   h: HoldingWithMetrics;
   onRemove: (s: string) => void;
+  onSell?: (s: string, price: number, date?: string) => Promise<void>;
   selected: boolean;
   onToggleSelect: (s: string) => void;
   deleting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
+  const [sellPrice, setSellPrice] = useState(h.current_price?.toFixed(2) ?? "");
+  const [sellDate, setSellDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selling, setSelling] = useState(false);
   const { data: analysis, loading: analysisLoading } = useAnalysis(expanded ? h.symbol : null, "sell");
   const sellResult = h.sell_result;
   const shouldSell = sellResult?.passed ?? false;
   const gainUp = (h.gain_pct ?? 0) >= 0;
 
-  // Parse institution name from notes, e.g. "Synced from Charles Schwab"
   const brokerageSource = useMemo(() => {
     if (!h.notes) return null;
     const m = h.notes.match(/^Synced from (.+)$/i);
     return m ? m[1] : null;
   }, [h.notes]);
+
+  const estimatedProceeds = sellPrice
+    ? (parseFloat(sellPrice) * (h.shares ?? 1)).toFixed(2)
+    : null;
+  const estimatedGain = (sellPrice && h.buy_price != null)
+    ? ((parseFloat(sellPrice) - h.buy_price) * (h.shares ?? 1)).toFixed(2)
+    : null;
+
+  async function handleSell() {
+    if (!onSell || !sellPrice) return;
+    setSelling(true);
+    try {
+      await onSell(h.symbol, parseFloat(sellPrice), sellDate);
+      setShowSellModal(false);
+    } finally {
+      setSelling(false);
+    }
+  }
+
+  return (
+    <>
+    <div className={clsx(
+      "rounded-2xl border overflow-hidden transition-all",
+      deleting ? "opacity-40 pointer-events-none" : "",
+      selected ? "border-green/40 bg-green/[0.04]" : shouldSell ? "border-red/20 bg-red/5" : "border-border/40 bg-white/[0.02]"
+    )}>
+      <div className="flex items-center gap-3 px-4 py-4">
+        <button
+          onClick={e => { e.stopPropagation(); onToggleSelect(h.symbol); }}
+          className={clsx(
+            "w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors",
+            selected ? "bg-green/20 border-green/50 text-green" : "border-border/50 text-transparent hover:border-green/30"
+          )}
+        >
+          {selected && <span className="text-[10px] font-bold leading-none">✓</span>}
+        </button>
+
+        <div className="flex flex-1 items-center gap-4 cursor-pointer hover:bg-white/[0.02] rounded-xl transition-colors -mx-1 px-1"
+          onClick={() => setExpanded(v => !v)}>
+          <div className={clsx(
+            "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold flex-shrink-0",
+            shouldSell ? "bg-gradient-to-br from-red/30 to-red/10 text-red" : "bg-gradient-to-br from-green/20 to-purple-500/10 text-green"
+          )}>
+            {h.symbol.slice(0, 2)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-white font-semibold text-sm">{h.symbol}</p>
+              <span className={clsx("text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide", shouldSell ? "bg-red/15 text-red" : "bg-green/10 text-green")}>
+                {shouldSell ? "SELL" : "HOLD"}
+              </span>
+              {brokerageSource && (
+                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <Building2 size={9} />{brokerageSource}
+                </span>
+              )}
+            </div>
+            <p className="text-muted text-xs mt-0.5">Since {h.buy_date} · {h.shares ?? 1} shares @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-white font-mono font-semibold">${h.current_price?.toFixed(2) ?? "—"}</p>
+            <p className={clsx("text-xs font-mono flex items-center justify-end gap-0.5", gainUp ? "text-green" : "text-red")}>
+              {gainUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {h.gain_pct != null ? `${gainUp ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—"}
+            </p>
+          </div>
+          <div className="text-right w-28">
+            <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
+              {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
+            </p>
+            <p className="text-muted text-[10px]">unrealized P&L</p>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {onSell && (
+              <button
+                onClick={e => { e.stopPropagation(); setSellPrice(h.current_price?.toFixed(2) ?? ""); setShowSellModal(true); }}
+                className="flex items-center gap-1 text-xs text-amber-400/80 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 border border-amber-400/20 px-2 py-1 rounded-lg transition-colors"
+                title="Record sale"
+              >
+                <DollarSign size={11} />Sell
+              </button>
+            )}
+            <button onClick={e => { e.stopPropagation(); onRemove(h.symbol); }}
+              disabled={deleting}
+              className="text-muted hover:text-red transition-colors p-1.5 rounded-lg hover:bg-red/10"
+              title="Delete position">
+              {deleting ? <RefreshCw size={13} className="animate-spin text-red/50" /> : <Trash2 size={13} />}
+            </button>
+            {expanded ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-border/30 px-5 pb-5 pt-4 space-y-4">
+          {h.history?.length > 0 && <PortfolioChart data={h.history} buyPrice={h.buy_price} height={200} />}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Buy Price", value: h.buy_price != null ? `$${h.buy_price.toFixed(2)}` : "—" },
+              { label: "Shares", value: h.shares != null ? String(h.shares) : "1" },
+              { label: "Total Value", value: h.total_value != null ? `$${h.total_value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
+              { label: "P&L (%)", value: h.gain_pct != null ? `${h.gain_pct >= 0 ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—" },
+              { label: "Cost Basis", value: (h.buy_price != null && h.shares != null) ? `$${(h.buy_price * h.shares).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
+              { label: "Current Price", value: h.current_price != null ? `$${h.current_price.toFixed(2)}` : "—" },
+              { label: "P&L ($)", value: h.gain_abs != null ? `${h.gain_abs >= 0 ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—" },
+              { label: "Gain/Share", value: (h.gain_pct != null && h.buy_price != null) ? `${h.gain_pct >= 0 ? "+" : ""}$${(h.gain_pct * h.buy_price).toFixed(2)}` : "—" },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-white/[0.03] rounded-xl px-3 py-3 border border-border/30">
+                <p className="text-muted text-[10px]">{label}</p>
+                <p className="text-white font-mono text-sm mt-1">{value}</p>
+              </div>
+            ))}
+          </div>
+          {sellResult && (
+            <div className="bg-white/[0.02] rounded-xl p-4 border border-border/30">
+              <p className="text-xs text-muted mb-2">Sell conditions — {sellResult.rules_met}/{sellResult.rules_total} triggered (need {sellResult.min_required})</p>
+              <div className="space-y-1.5">
+                {sellResult.details.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 text-xs">
+                    <span className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0", r.passed ? "bg-red" : "bg-white/15")} />
+                    <span className={r.passed ? "text-red/90" : "text-muted"}>{r.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-muted mb-2">AI Sell Analysis</p>
+            {analysisLoading ? (
+              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-muted animate-pulse border border-border/30">Analyzing...</div>
+            ) : analysis?.analysis_text ? (
+              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-white leading-relaxed space-y-1 border border-border/30">
+                {analysis.analysis_text.split("\n").filter(Boolean).map((line: string, i: number) => (
+                  <p key={i} className={line.startsWith("-") ? "pl-2 text-white/70" : ""}>{line}</p>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-muted border border-border/30">Expand to load analysis</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Sell modal */}
+    {showSellModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSellModal(false)}>
+        <div className="bg-card2 border border-border rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4" onClick={e => e.stopPropagation()}>
+          <div>
+            <p className="text-white font-semibold text-base">Record Sale — {h.symbol}</p>
+            <p className="text-muted text-xs mt-1">{h.shares} shares · bought @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-muted">Sell Price per Share</label>
+              <input type="number" step="0.01" value={sellPrice} onChange={e => setSellPrice(e.target.value)}
+                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50" />
+            </div>
+            <div>
+              <label className="text-xs text-muted">Sell Date</label>
+              <input type="date" value={sellDate} onChange={e => setSellDate(e.target.value)}
+                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50" />
+            </div>
+            {estimatedProceeds && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="bg-white/[0.03] rounded-xl px-3 py-2 border border-border/30">
+                  <p className="text-muted text-[10px]">Proceeds</p>
+                  <p className="text-white font-mono text-sm">${parseFloat(estimatedProceeds).toLocaleString("en-US", { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div className="bg-white/[0.03] rounded-xl px-3 py-2 border border-border/30">
+                  <p className="text-muted text-[10px]">Realized P&L</p>
+                  <p className={clsx("font-mono text-sm", estimatedGain && parseFloat(estimatedGain) >= 0 ? "text-green" : "text-red")}>
+                    {estimatedGain ? `${parseFloat(estimatedGain) >= 0 ? "+" : ""}$${Math.abs(parseFloat(estimatedGain)).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={handleSell} disabled={selling || !sellPrice}
+              className="flex-1 bg-amber-400/15 hover:bg-amber-400/25 disabled:opacity-50 text-amber-400 border border-amber-400/30 rounded-xl py-2.5 text-sm font-medium transition-colors">
+              {selling ? "Recording…" : "Confirm Sale"}
+            </button>
+            <button onClick={() => setShowSellModal(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
 
   return (
     <div className={clsx(
@@ -218,7 +416,7 @@ function HoldingRow({
   );
 }
 
-export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRemoveMultiple, onPortfolioRefresh }: Props) {
+export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRemoveMultiple, onSell, onPortfolioRefresh }: Props) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [symbol, setSymbol] = useState("");
   const [buyDate, setBuyDate] = useState(new Date().toISOString().slice(0, 10));
@@ -240,6 +438,10 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
   const sellCount = holdings.filter(h => h.sell_result?.passed).length;
   const hasData = holdings.some(h => h.gain_abs != null);
   const combinedHistory = useMemo(() => buildCombinedHistory(holdings), [holdings]);
+
+  // Sold positions history
+  const { data: soldPositions, loading: soldLoading, refresh: refreshSold } = useSoldPositions();
+  const totalRealized = soldPositions.reduce((s: number, p: any) => s + (p.realized_gain ?? 0), 0);
 
   // Universe signals
   const { data: signals, loading: signalsLoading, refresh: refreshSignals } = useUniverseSignals();
@@ -537,7 +739,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                   color: "text-white", sub: "Active holdings" },
                 { label: "Sell Signals", value: String(sellCount),
                   color: sellCount > 0 ? "text-red" : "text-green",
-                  sub: sellCount > 0 ? "Action required" : "All clear" },
+                  sub: sellCount > 0 ? "Meet your sell criteria" : "All clear" },
               ].map(({ label, value, color, sub }) => (
                 <div key={label} className="bg-card2 rounded-2xl px-4 py-3 border border-border/40">
                   <p className="text-muted text-xs">{label}</p>
@@ -620,7 +822,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                 ) : filteredHoldings.length === 0 && positionSearch ? (
                   <div className="text-muted text-sm text-center py-8">No positions match "{positionSearch}"</div>
                 ) : (
-                  filteredHoldings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={handleSingleRemove} selected={selected.has(h.symbol)} onToggleSelect={toggleSelect} deleting={deletingSymbols.has(h.symbol)} />)
+                  filteredHoldings.map(h => <HoldingRow key={h.symbol} h={h} onRemove={handleSingleRemove} onSell={onSell} selected={selected.has(h.symbol)} onToggleSelect={toggleSelect} deleting={deletingSymbols.has(h.symbol)} />)
                 )}
                 {/* Optimistic placeholder while new holding is loading */}
                 {optimisticSymbol && !holdings.find(h => h.symbol === optimisticSymbol) && (
@@ -643,6 +845,58 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
               </div>
             </div>
             </>
+          )}
+
+          {/* ── Sold Positions History ── */}
+          {(soldPositions.length > 0 || soldLoading) && (
+            <div className="anim-fade-up space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <History size={14} className="text-muted" />
+                  <p className="text-white font-semibold">Trade History</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {totalRealized !== 0 && (
+                    <span className={clsx("text-sm font-mono font-semibold", totalRealized >= 0 ? "text-green" : "text-red")}>
+                      {totalRealized >= 0 ? "+" : ""}${Math.abs(totalRealized).toLocaleString("en-US", { maximumFractionDigits: 2 })} realized
+                    </span>
+                  )}
+                  <button onClick={refreshSold} className="text-muted hover:text-green transition-colors p-1 rounded-lg hover:bg-white/5">
+                    <RefreshCw size={11} className={soldLoading ? "animate-spin text-green" : ""} />
+                  </button>
+                </div>
+              </div>
+              {soldLoading ? (
+                Array.from({ length: 2 }).map((_, i) => <div key={i} className="chart-skeleton h-12 rounded-xl" />)
+              ) : (
+                soldPositions.map((p: any) => {
+                  const gain = p.realized_gain ?? 0;
+                  const gainUp = gain >= 0;
+                  const pct = p.realized_pct != null ? `${gainUp ? "+" : ""}${p.realized_pct.toFixed(2)}%` : null;
+                  return (
+                    <div key={p.id} className="flex items-center gap-4 px-4 py-3 rounded-2xl border border-border/40 bg-white/[0.02]">
+                      <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0", gainUp ? "bg-green/10 text-green" : "bg-red/10 text-red")}>
+                        {p.symbol.slice(0, 2)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold">{p.symbol}</p>
+                        <p className="text-muted text-xs">Sold {p.sell_date} · {p.shares} sh @ ${p.sell_price?.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
+                          {gainUp ? "+" : ""}${Math.abs(gain).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                        </p>
+                        {pct && <p className={clsx("text-[10px] font-mono", gainUp ? "text-green/70" : "text-red/70")}>{pct}</p>}
+                      </div>
+                      <div className="text-right text-xs text-muted w-24">
+                        <p>Bought @ ${p.buy_price?.toFixed(2) ?? "—"}</p>
+                        <p>{p.buy_date ?? ""}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           )}
         </div>{/* end left column */}
 
