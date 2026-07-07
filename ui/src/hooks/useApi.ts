@@ -342,6 +342,7 @@ export { apiFetch };
 
 export interface CreditsStatus {
   has_own_key: boolean;
+  unlimited: boolean;
   metered: boolean;
   tokens_used: number;
   token_limit: number;

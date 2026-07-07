@@ -206,6 +206,18 @@ function AiCreditsSection() {
             </button>
           </div>
         </div>
+      ) : credits.unlimited ? (
+        <div className="bg-green/5 border border-green/20 rounded-2xl px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-green/15 text-green flex items-center justify-center flex-shrink-0">
+              <Zap size={16} />
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm">Unlimited access</p>
+              <p className="text-muted text-xs mt-0.5">This account has no usage cap</p>
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-5 mb-6">

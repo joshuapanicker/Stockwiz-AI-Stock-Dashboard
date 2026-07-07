@@ -29,6 +29,16 @@ import anthropic
 FREE_MONTHLY_TOKENS = int(os.environ.get("FREE_MONTHLY_TOKENS", 200_000))
 WARN_PCT = 0.80
 
+# Comma-separated Supabase user IDs exempt from metering (app owner/testers).
+# Still uses the shared ANTHROPIC_API_KEY, just never capped or counted.
+_ADMIN_USER_IDS = {
+    uid.strip() for uid in os.environ.get("ADMIN_USER_IDS", "").split(",") if uid.strip()
+}
+
+
+def _is_admin(user_id: str | None) -> bool:
+    return bool(user_id) and user_id in _ADMIN_USER_IDS
+
 _LOCAL_USAGE_PATH = Path(__file__).parent.parent / "data" / "ai_usage.json"
 _local_lock = threading.Lock()
 
@@ -148,6 +158,11 @@ def resolve_api_key(user_id: str | None) -> tuple[str, bool]:
     own = get_user_api_key(user_id)
     if own:
         return own, False
+    if _is_admin(user_id):
+        shared = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if not shared:
+            raise RuntimeError("ANTHROPIC_API_KEY not set.")
+        return shared, False
     if user_id and get_tokens_used(user_id) >= FREE_MONTHLY_TOKENS:
         raise CreditsExhausted(
             "You've used all your free AI credits for this month. "
@@ -170,9 +185,11 @@ def metered_create(user_id: str | None, **kwargs):
 
 
 def credits_status(user_id: str) -> dict:
-    if get_user_api_key(user_id):
+    has_key = bool(get_user_api_key(user_id))
+    if has_key or _is_admin(user_id):
         return {
-            "has_own_key": True,
+            "has_own_key": has_key,
+            "unlimited": True,
             "metered": False,
             "tokens_used": 0,
             "token_limit": FREE_MONTHLY_TOKENS,
@@ -186,6 +203,7 @@ def credits_status(user_id: str) -> dict:
     pct = min(used / FREE_MONTHLY_TOKENS, 1.0) if FREE_MONTHLY_TOKENS else 1.0
     return {
         "has_own_key": False,
+        "unlimited": False,
         "metered": True,
         "tokens_used": used,
         "token_limit": FREE_MONTHLY_TOKENS,

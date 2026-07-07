@@ -206,11 +206,11 @@ export default function ProfilePanel({ open, onClose, onOpenSettings, portfolioS
               style={{ width: "calc(100% - 2rem)" }}>
               {!credits ? (
                 <p className="text-muted text-xs">Loading...</p>
-              ) : credits.has_own_key ? (
+              ) : credits.unlimited ? (
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-white text-sm font-semibold">Own API Key</p>
-                    <p className="text-muted text-xs mt-0.5">Unmetered usage</p>
+                    <p className="text-white text-sm font-semibold">{credits.has_own_key ? "Own API Key" : "Unlimited Access"}</p>
+                    <p className="text-muted text-xs mt-0.5">{credits.has_own_key ? "Unmetered usage" : "No usage cap on this account"}</p>
                   </div>
                   <div className="bg-green/15 text-green text-[10px] font-semibold px-2 py-0.5 rounded-full">
                     Active
