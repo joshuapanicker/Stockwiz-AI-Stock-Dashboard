@@ -87,7 +87,7 @@ export default function VolumeProfileChart({ history, currentPrice, height = 150
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 8, left: -10, bottom: 0 }}>
           <XAxis
             type="number"
-            tick={{ fill: "#6b7280", fontSize: 9 }}
+            tick={{ fill: "#6E7787", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={v => v >= 1e9 ? `${(v/1e9).toFixed(0)}B` : v >= 1e6 ? `${(v/1e6).toFixed(0)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : String(v)}
@@ -96,7 +96,7 @@ export default function VolumeProfileChart({ history, currentPrice, height = 150
             dataKey="price"
             type="number"
             domain={["auto", "auto"]}
-            tick={{ fill: "#6b7280", fontSize: 9 }}
+            tick={{ fill: "#6E7787", fontSize: 9 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={v => `$${Number(v).toFixed(0)}`}
@@ -106,7 +106,7 @@ export default function VolumeProfileChart({ history, currentPrice, height = 150
           {currentPrice && (
             <ReferenceLine
               y={currentPrice}
-              stroke="rgba(0,230,118,0.7)"
+              stroke="rgba(46,230,168,0.7)"
               strokeDasharray="3 3"
               strokeWidth={1}
             />
@@ -115,7 +115,7 @@ export default function VolumeProfileChart({ history, currentPrice, height = 150
             {data.map((entry, i) => (
               <Cell
                 key={i}
-                fill={entry.isHvn ? "rgba(0,230,118,0.7)" : "rgba(0,230,118,0.22)"}
+                fill={entry.isHvn ? "rgba(46,230,168,0.7)" : "rgba(46,230,168,0.22)"}
               />
             ))}
           </Bar>

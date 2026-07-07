@@ -7,21 +7,10 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import clsx from "clsx";
 import { Send, Bot, RefreshCw, X, SlidersHorizontal, Sparkles, Database, User, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { apiFetch, useUniverseStatus, useUniverseSectors, API_BASE } from "../hooks/useApi";
+import TickerLogo from "./TickerLogo";
 import type { UniverseStock, UniverseFilters } from "../types";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function SectorDot({ sector }: { sector: string | null }) {
-  const colors: Record<string, string> = {
-    "Technology": "bg-blue-400", "Healthcare": "bg-green",
-    "Financial Services": "bg-yellow-400", "Consumer Cyclical": "bg-orange",
-    "Industrials": "bg-slate-400", "Consumer Defensive": "bg-teal-400",
-    "Energy": "bg-amber-400", "Basic Materials": "bg-stone-400",
-    "Real Estate": "bg-pink-400", "Communication Services": "bg-purple",
-    "Utilities": "bg-cyan-400",
-  };
-  return <span className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0", sector ? (colors[sector] ?? "bg-white/30") : "bg-white/10")} title={sector ?? ""} />;
-}
 
 function CacheStatus() {
   const status = useUniverseStatus();
@@ -236,11 +225,11 @@ function Row({ stock, rank, selected, onSelect }: {
   return (
     <tr onClick={() => onSelect(stock.symbol, stock)}
       className={clsx("border-b border-border/40 cursor-pointer transition-colors text-xs",
-        selected ? "bg-card2" : "hover:bg-white/[0.02]")}>
+        selected ? "bg-green/[0.06]" : "hover:bg-white/[0.04]")}>
       <td className="py-2 px-2 text-muted font-mono text-[10px] w-6 text-center">{rank}</td>
       <td className="py-2 px-2">
-        <div className="flex items-center gap-1.5">
-          <SectorDot sector={stock.sector} />
+        <div className="flex items-center gap-2" title={stock.sector ?? ""}>
+          <TickerLogo symbol={stock.symbol} size={18} />
           <span className="font-mono font-semibold text-white text-[11px]">{stock.symbol}</span>
         </div>
       </td>

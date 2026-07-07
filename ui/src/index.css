@@ -13,10 +13,93 @@ html, body, #root {
 }
 
 body {
-  background-color: #0d0d0f;
+  background-color: #0B0D12;
   color: white;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Pulse aurora ambience ─────────────────────────────────────────────
+   Slow-breathing color fields behind the whole app. Fixed, non-interactive. */
+.aurora-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform, opacity;
+}
+
+.aurora-teal {
+  width: 480px; height: 480px;
+  background: #2EE6A8;
+  opacity: 0.10;
+  top: -180px; left: -140px;
+  animation: auroraBreathe 9s ease-in-out infinite;
+}
+
+.aurora-violet {
+  width: 420px; height: 420px;
+  background: #8055F5;
+  opacity: 0.07;
+  top: -80px; right: -160px;
+  animation: auroraBreathe 11s ease-in-out 1.5s infinite;
+}
+
+.aurora-sky {
+  width: 380px; height: 380px;
+  background: #3FA7FC;
+  opacity: 0.04;
+  bottom: -160px; left: 30%;
+}
+
+@keyframes auroraBreathe {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  50%      { transform: scale(1.18) translate(24px, 16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-teal, .aurora-violet { animation: none; }
+}
+
+/* ── Glass surfaces ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ── Chart hover interaction ─────────────────────────────────────────────
+   Any card carrying .chart-card lifts and glows teal when the cursor is
+   over it, so it's always clear which graph you're inspecting. */
+.chart-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(46, 230, 168, 0.35) !important;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45), 0 0 22px rgba(46, 230, 168, 0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-card, .chart-card:hover { transform: none; }
+}
+
+/* ── Resize handles ── */
+.divider-handle {
+  transition: background-color 0.2s ease;
+}
+.divider-handle:hover .divider-line,
+.divider-handle.dragging .divider-line {
+  background-color: rgba(46, 230, 168, 0.55);
+  box-shadow: 0 0 8px rgba(46, 230, 168, 0.35);
 }
 
 /* Scrollbar */
@@ -93,7 +176,7 @@ body {
 }
 
 .chart-skeleton {
-  background: linear-gradient(90deg, #1a1a22 25%, #22222e 50%, #1a1a22 75%);
+  background: linear-gradient(90deg, #171C29 25%, #1F2533 50%, #171C29 75%);
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
   border-radius: 8px;

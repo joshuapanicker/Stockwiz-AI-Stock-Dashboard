@@ -50,20 +50,20 @@ export default function BollingerChart({ history, height = 190 }: Props) {
       <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <defs>
           <linearGradient id="bbGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.03} />
+            <stop offset="5%"  stopColor="#8055F5" stopOpacity={0.15} />
+            <stop offset="95%" stopColor="#8055F5" stopOpacity={0.03} />
           </linearGradient>
         </defs>
-        <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+        <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           tickFormatter={v => `$${Number(v).toFixed(0)}`} domain={["auto", "auto"]} width={42} />
         <Tooltip content={<CustomTooltip />} />
         {/* Band area */}
         <Area type="monotone" dataKey="Band" stroke="none" fill="url(#bbGrad)" name="Bands" />
         {/* Middle SMA */}
-        <Line type="monotone" dataKey="Middle" stroke="#7c3aed" strokeWidth={1} dot={false} strokeDasharray="3 2" name="SMA 20" />
+        <Line type="monotone" dataKey="Middle" stroke="#8055F5" strokeWidth={1} dot={false} strokeDasharray="3 2" name="SMA 20" />
         {/* Price */}
-        <Line type="monotone" dataKey="Price" stroke="#00e676" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} name="Price" />
+        <Line type="monotone" dataKey="Price" stroke="#2EE6A8" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} name="Price" />
       </ComposedChart>
     </ResponsiveContainer>
   );

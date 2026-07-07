@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeftRight, ChevronDown } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, EyeOff } from "lucide-react";
 
 import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
@@ -68,7 +68,7 @@ export function ChartRenderer({ type, history, history6m, symbol, currentPrice, 
 
   switch (type) {
     case "candlestick":       return <CandlestickChart data={h1y} height={height} />;
-    case "area":              return <AreaChart data={area} height={height} color="#00e676" />;
+    case "area":              return <AreaChart data={area} height={height} color="#2EE6A8" />;
     case "roi":               return roi.length ? <ROIChart data={roi} height={height} /> : <div className="flex items-center justify-center text-muted text-xs" style={{ height }}>No data</div>;
     case "volume_profile":    return <VolumeProfileChart history={h1y} currentPrice={currentPrice} height={height} />;
     case "moving_averages":   return <MovingAverageChart history={h1y} height={height} />;
@@ -91,11 +91,12 @@ interface Props {
   label?: string;
   extra?: React.ReactNode;  // extra content in the header (e.g. period selector)
   loadingSkeleton?: boolean;
+  onHide?: () => void;      // when provided, the menu offers "Hide widget"
 }
 
 export default function ChartWidget({
   slotKey, defaultType, history, history6m, symbol,
-  currentPrice, height, label, extra, loadingSkeleton,
+  currentPrice, height, label, extra, loadingSkeleton, onHide,
 }: Props) {
   const storageKey = `chart_widget_${slotKey}`;
   const [chartType, setChartType] = useState<ChartType>(() => {
@@ -160,6 +161,14 @@ export default function ChartWidget({
                 {chartType === opt.value && <span className="text-green text-[10px] mt-0.5">✓</span>}
               </button>
             ))}
+            {onHide && (
+              <button
+                onClick={() => { setMenuOpen(false); onHide(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-muted hover:text-red hover:bg-red/5 transition-colors border-t border-border/50 mt-1">
+                <EyeOff size={11} />
+                <span className="text-xs font-medium">Hide widget</span>
+              </button>
+            )}
           </div>
         )}
       </div>

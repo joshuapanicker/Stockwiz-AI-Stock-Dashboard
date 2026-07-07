@@ -229,7 +229,7 @@ function ScrollFeatureShowcase() {
     /* Outer tall container — provides scroll room (300vh) */
     <div ref={containerRef} style={{ height: `${FEATURE_TABS.length * 100}vh` }} className="relative w-full">
       {/* Sticky inner — fills full viewport, content centered */}
-      <div style={{ position: "sticky", top: 0, height: "100vh", width: "100%", background: "var(--bg, #0d0d0f)" }}>
+      <div style={{ position: "sticky", top: 0, height: "100vh", width: "100%", background: "var(--bg, #0B0D12)" }}>
         <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2rem 2rem", maxWidth: "80rem", margin: "0 auto" }}>
 
         {/* Section header */}
@@ -278,7 +278,7 @@ function ScrollFeatureShowcase() {
           <div className="flex-1 min-w-0 relative overflow-hidden" style={{ maxHeight: "calc(100vh - 280px)" }}>
             {/* Glow */}
             <div className="absolute -inset-4 rounded-3xl blur-3xl opacity-25 pointer-events-none"
-              style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(0,230,118,0.3), transparent 70%)" }} />
+              style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.3), transparent 70%)" }} />
 
             {/* Current image */}
             <div className="relative rounded-2xl overflow-hidden border border-border/60 shadow-2xl" style={{ opacity: imgOpacity, transition: "opacity 0.15s ease" }}>
@@ -340,13 +340,13 @@ export default function LandingPage() {
 
       {/* Animated background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0,230,118,0.10) 0%, transparent 60%)" }} />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(124,58,237,0.07) 0%, transparent 55%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.10) 0%, transparent 60%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.07) 0%, transparent 55%)" }} />
         {/* Slow-moving gradient orbs */}
         <div className="absolute w-96 h-96 rounded-full opacity-20 blur-3xl"
-          style={{ background: "rgba(0,230,118,0.15)", top: "10%", left: "5%", animation: "float 12s ease-in-out infinite" }} />
+          style={{ background: "rgba(46,230,168,0.15)", top: "10%", left: "5%", animation: "float 12s ease-in-out infinite" }} />
         <div className="absolute w-72 h-72 rounded-full opacity-15 blur-3xl"
-          style={{ background: "rgba(124,58,237,0.2)", bottom: "20%", right: "10%", animation: "float 16s ease-in-out infinite reverse" }} />
+          style={{ background: "rgba(128,85,245,0.2)", bottom: "20%", right: "10%", animation: "float 16s ease-in-out infinite reverse" }} />
       </div>
 
       {/* ── NAV ── */}
@@ -413,7 +413,7 @@ export default function LandingPage() {
             <FadeIn direction="up" delay={380}>
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-2">
-                  {["#00e676","#7c3aed","#ff6d00","#00bcd4"].map((c, i) => (
+                  {["#2EE6A8","#8055F5","#FFAC26","#00bcd4"].map((c, i) => (
                     <div key={i} className="w-7 h-7 rounded-full border-2 border-bg flex items-center justify-center text-[10px] font-bold text-white"
                       style={{ background: c }}>{["J","A","M","S"][i]}</div>
                   ))}
@@ -429,7 +429,7 @@ export default function LandingPage() {
               <div className="relative">
                 {/* Glow behind the frame */}
                 <div className="absolute -inset-4 rounded-3xl opacity-30 blur-2xl"
-                  style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(0,230,118,0.3), transparent 70%)" }} />
+                  style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.3), transparent 70%)" }} />
                 <BrowserFrame
                   src="/screenshots/dashboard.png"
                   alt="StockWiz dashboard showing candlestick charts and AI analysis"

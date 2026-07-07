@@ -57,17 +57,17 @@ export default function MovingAverageChart({ history, height = 190 }: Props) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-        <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           interval="preserveStartEnd" />
-        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           tickFormatter={v => `$${Number(v).toFixed(0)}`} domain={["auto", "auto"]} width={42} />
         <Tooltip content={<CustomTooltip />} />
         <Legend wrapperStyle={{ fontSize: 9, paddingTop: 4 }}
           formatter={v => <span style={{ color: "#9ca3af" }}>{v}</span>} />
-        <Line type="monotone" dataKey="Price"   stroke="#00e676" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
-        <Line type="monotone" dataKey="20 DMA"  stroke="#7c3aed" strokeWidth={1.5} dot={false} strokeDasharray="0" activeDot={{ r: 3 }} connectNulls />
-        <Line type="monotone" dataKey="50 DMA"  stroke="#ff6d00" strokeWidth={1.5} dot={false} strokeDasharray="0" activeDot={{ r: 3 }} connectNulls />
-        <Line type="monotone" dataKey="200 DMA" stroke="#ff1744" strokeWidth={1}   dot={false} strokeDasharray="4 2" activeDot={{ r: 3 }} connectNulls />
+        <Line type="monotone" dataKey="Price"   stroke="#2EE6A8" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
+        <Line type="monotone" dataKey="20 DMA"  stroke="#8055F5" strokeWidth={1.5} dot={false} strokeDasharray="0" activeDot={{ r: 3 }} connectNulls />
+        <Line type="monotone" dataKey="50 DMA"  stroke="#FFAC26" strokeWidth={1.5} dot={false} strokeDasharray="0" activeDot={{ r: 3 }} connectNulls />
+        <Line type="monotone" dataKey="200 DMA" stroke="#FF5C7A" strokeWidth={1}   dot={false} strokeDasharray="4 2" activeDot={{ r: 3 }} connectNulls />
       </ComposedChart>
     </ResponsiveContainer>
   );

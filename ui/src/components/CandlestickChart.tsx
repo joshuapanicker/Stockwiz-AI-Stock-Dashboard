@@ -25,7 +25,7 @@ export default function CandlestickChart({ data, height = 220 }: Props) {
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#6b7280",
+        textColor: "#6E7787",
         fontSize: 11,
         fontFamily: "Inter, system-ui, sans-serif",
         attributionLogo: false,
@@ -36,12 +36,12 @@ export default function CandlestickChart({ data, height = 220 }: Props) {
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#1a1a22" },
-        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#1a1a22" },
+        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#171C29" },
+        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#171C29" },
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.06)",
-        textColor: "#6b7280",
+        textColor: "#6E7787",
         scaleMargins: { top: 0.1, bottom: 0.25 },
       },
       timeScale: {
@@ -56,16 +56,16 @@ export default function CandlestickChart({ data, height = 220 }: Props) {
     });
 
     const candleSeries = chart.addCandlestickSeries({
-      upColor: "#00e676",
-      downColor: "#ff1744",
-      borderUpColor: "#00e676",
-      borderDownColor: "#ff1744",
-      wickUpColor: "#00c853",
+      upColor: "#2EE6A8",
+      downColor: "#FF5C7A",
+      borderUpColor: "#2EE6A8",
+      borderDownColor: "#FF5C7A",
+      wickUpColor: "#1FC48D",
       wickDownColor: "#d50000",
     });
 
     const volumeSeries = chart.addHistogramSeries({
-      color: "rgba(0,230,118,0.15)",
+      color: "rgba(46,230,168,0.15)",
       priceFormat: { type: "volume" },
       priceScaleId: "volume",
     });
@@ -105,7 +105,7 @@ export default function CandlestickChart({ data, height = 220 }: Props) {
     const volumes = data.map((d) => ({
       time: d.date as any,
       value: d.volume,
-      color: d.close >= d.open ? "rgba(0,230,118,0.2)" : "rgba(255,23,68,0.2)",
+      color: d.close >= d.open ? "rgba(46,230,168,0.2)" : "rgba(255,92,122,0.2)",
     }));
 
     candleRef.current.setData(candles);

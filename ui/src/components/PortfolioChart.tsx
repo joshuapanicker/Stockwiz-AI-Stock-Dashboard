@@ -33,7 +33,7 @@ export default function PortfolioChart({ data, buyPrice, height = 160 }: Props) 
 
   const latest = data[data.length - 1]?.close ?? 0;
   const isUp = buyPrice == null || latest >= buyPrice;
-  const lineColor = isUp ? "#00e676" : "#ff1744";
+  const lineColor = isUp ? "#2EE6A8" : "#FF5C7A";
   const gradId = isUp ? "pfGradUp" : "pfGradDown";
 
   return (
@@ -41,24 +41,24 @@ export default function PortfolioChart({ data, buyPrice, height = 160 }: Props) 
       <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <defs>
           <linearGradient id="pfGradUp" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#00e676" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="#00e676" stopOpacity={0.02} />
+            <stop offset="5%" stopColor="#2EE6A8" stopOpacity={0.35} />
+            <stop offset="95%" stopColor="#2EE6A8" stopOpacity={0.02} />
           </linearGradient>
           <linearGradient id="pfGradDown" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#ff1744" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="#ff1744" stopOpacity={0.02} />
+            <stop offset="5%" stopColor="#FF5C7A" stopOpacity={0.35} />
+            <stop offset="95%" stopColor="#FF5C7A" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         <XAxis
           dataKey="date"
-          tick={{ fill: "#6b7280", fontSize: 10 }}
+          tick={{ fill: "#6E7787", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => v.slice(5)}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fill: "#6b7280", fontSize: 10 }}
+          tick={{ fill: "#6E7787", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `$${v.toFixed(0)}`}
@@ -80,7 +80,7 @@ export default function PortfolioChart({ data, buyPrice, height = 160 }: Props) 
           strokeWidth={2}
           fill={`url(#${gradId})`}
           dot={false}
-          activeDot={{ r: 4, fill: lineColor, stroke: "#131318", strokeWidth: 2 }}
+          activeDot={{ r: 4, fill: lineColor, stroke: "#10131A", strokeWidth: 2 }}
         />
       </AreaChart>
     </ResponsiveContainer>

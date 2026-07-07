@@ -15,7 +15,7 @@ interface Props {
   label?: string;
 }
 
-export default function AreaChart({ data, color = "#00e676", height = 220, label }: Props) {
+export default function AreaChart({ data, color = "#2EE6A8", height = 220, label }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
@@ -26,7 +26,7 @@ export default function AreaChart({ data, color = "#00e676", height = 220, label
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#6b7280",
+        textColor: "#6E7787",
         fontSize: 11,
         fontFamily: "Inter, system-ui, sans-serif",
         attributionLogo: false,
@@ -37,12 +37,12 @@ export default function AreaChart({ data, color = "#00e676", height = 220, label
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#1a1a22" },
-        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#1a1a22" },
+        vertLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#171C29" },
+        horzLine: { color: "rgba(255,255,255,0.2)", labelBackgroundColor: "#171C29" },
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.06)",
-        textColor: "#6b7280",
+        textColor: "#6E7787",
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       timeScale: {
@@ -64,7 +64,7 @@ export default function AreaChart({ data, color = "#00e676", height = 220, label
       crosshairMarkerVisible: true,
       crosshairMarkerRadius: 4,
       crosshairMarkerBorderColor: color,
-      crosshairMarkerBackgroundColor: "#131318",
+      crosshairMarkerBackgroundColor: "#10131A",
     });
 
     chartRef.current = chart;

@@ -43,7 +43,7 @@ export default function AuthPage() {
     <div className="h-screen bg-bg flex items-center justify-center relative overflow-hidden">
       {/* Background gradient */}
       <div className="fixed inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,230,118,0.08) 0%, transparent 60%)" }} />
+        style={{ background: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(46,230,168,0.08) 0%, transparent 60%)" }} />
 
       <div className="relative z-10 w-full max-w-sm px-4">
         {/* Logo */}
