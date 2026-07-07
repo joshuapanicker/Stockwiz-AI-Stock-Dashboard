@@ -19,7 +19,11 @@ function Root() {
     );
   }
 
-  return <App />; // TEMP preview bypass
+  if (!user) {
+    return <LandingPage />;
+  }
+
+  return <App />;
 }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
