@@ -9,6 +9,7 @@ import {
 import PortfolioChart from "./PortfolioChart";
 import SymbolSearch from "./SymbolSearch";
 import PlaidConnect from "./PlaidConnect";
+import TickerLogo from "./TickerLogo";
 import { useAnalysis, useUniverseSignals, useSoldPositions } from "../hooks/useApi";
 import type { HoldingWithMetrics } from "../types";
 
@@ -121,11 +122,11 @@ function HoldingRow({
 
         <div className="flex flex-1 items-center gap-4 cursor-pointer hover:bg-white/[0.02] rounded-xl transition-colors -mx-1 px-1"
           onClick={() => setExpanded(v => !v)}>
-          <div className={clsx(
-            "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold flex-shrink-0",
-            shouldSell ? "bg-gradient-to-br from-red/30 to-red/10 text-red" : "bg-gradient-to-br from-green/20 to-purple-500/10 text-green"
-          )}>
-            {h.symbol.slice(0, 2)}
+          <div className="relative flex-shrink-0">
+            <TickerLogo symbol={h.symbol} size={40} />
+            {shouldSell && (
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-red border-2 border-card2" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -761,8 +762,12 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                   const pct = p.realized_pct != null ? `${gainUp ? "+" : ""}${p.realized_pct.toFixed(2)}%` : null;
                   return (
                     <div key={p.id} className="flex items-center gap-4 px-4 py-3 rounded-2xl border border-border/40 bg-white/[0.02]">
-                      <div className={clsx("w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0", gainUp ? "bg-green/10 text-green" : "bg-red/10 text-red")}>
-                        {p.symbol.slice(0, 2)}
+                      <div className="relative flex-shrink-0">
+                        <TickerLogo symbol={p.symbol} size={36} />
+                        <span className={clsx(
+                          "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card2",
+                          gainUp ? "bg-green" : "bg-red"
+                        )} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-semibold">{p.symbol}</p>
