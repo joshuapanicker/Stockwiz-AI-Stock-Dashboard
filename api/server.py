@@ -55,7 +55,7 @@ async def prewarm():
     from core.metrics import get_price_history, get_stock_metrics, get_market_context
     from core.universe_fetcher import start_background_fetcher
 
-    async def warm(symbol: str):
+    def warm(symbol: str):
         try:
             get_stock_metrics(symbol)
             get_price_history(symbol, "1y")
@@ -65,9 +65,11 @@ async def prewarm():
 
     async def run():
         await asyncio.sleep(1)  # let server finish starting
-        get_market_context()
+        # Run all warm-up fetches on worker threads so the event loop stays
+        # free to serve requests while the cache fills.
+        await asyncio.to_thread(get_market_context)
         symbols = get_watchlist()[:8]  # top 8 only
-        await asyncio.gather(*[warm(s) for s in symbols])
+        await asyncio.gather(*[asyncio.to_thread(warm, s) for s in symbols])
         # Start universe background fetcher in a thread
         start_background_fetcher()
 
@@ -151,19 +153,39 @@ def history(symbol: str, period: str = "1y"):
 
 @app.get("/api/news/{symbol}")
 def stock_news(symbol: str):
+    from concurrent.futures import ThreadPoolExecutor
     from core.news import get_recent_news, get_recent_earnings
-    return {
-        "headlines": get_recent_news(symbol),
-        "earnings": get_recent_earnings(symbol),
-    }
+    # Headlines and earnings are independent yfinance calls — fetch concurrently
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_news = pool.submit(get_recent_news, symbol)
+        f_earnings = pool.submit(get_recent_earnings, symbol)
+        return {
+            "headlines": f_news.result(),
+            "earnings": f_earnings.result(),
+        }
+
+
+# ── Metrics (fast, no LLM) ────────────────────────────────────────────────
+
+@app.get("/api/metrics/{symbol}")
+def stock_metrics(symbol: str):
+    """Lightweight metrics endpoint so clients can render price/fundamentals
+    immediately without waiting for the AI analysis to complete."""
+    try:
+        return get_stock_metrics(symbol)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ── Analysis ──────────────────────────────────────────────────────────────
 
+# NOTE: sync `def` endpoints run on FastAPI's worker threadpool, so slow
+# yfinance/LLM work here no longer blocks the event loop (and every other
+# in-flight request) the way an `async def` with blocking calls did.
 @app.get("/api/analyze/{symbol}")
-async def analyze(symbol: str, action: str = "buy"):
+def analyze(symbol: str, action: str = "buy"):
     try:
-        return await analyze_stock(symbol, action)
+        return analyze_stock(symbol, action)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -171,7 +193,7 @@ async def analyze(symbol: str, action: str = "buy"):
 # ── Prediction ────────────────────────────────────────────────────────────
 
 @app.get("/api/predict/{symbol}")
-async def predict(symbol: str):
+def predict(symbol: str):
     try:
         from core.prediction import predict_stock
         return predict_stock(symbol)
@@ -205,9 +227,11 @@ def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400):
 
 @app.post("/api/chat/general")
 async def general_chat_endpoint(req: ChatRequest):
+    import asyncio
     from core.general_chat import build_system
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
-    system = build_system(messages)
+    # build_system does blocking network I/O — keep it off the event loop
+    system = await asyncio.to_thread(build_system, messages)
     return StreamingResponse(
         _stream_anthropic(system, messages, max_tokens=400),
         media_type="text/event-stream",
@@ -235,9 +259,11 @@ async def generate_title(req: ChatRequest):
 @app.post("/api/chat/{symbol}")
 async def chat_endpoint(symbol: str, req: ChatRequest,
                         user_id: str = Depends(get_current_user)):
+    import asyncio
     from core.chat import build_system as build_stock_system
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
-    system = build_stock_system(symbol, messages, user_id=user_id)
+    # build_system fetches metrics/news over the network — keep it off the event loop
+    system = await asyncio.to_thread(build_stock_system, symbol, messages, user_id=user_id)
     return StreamingResponse(
         _stream_anthropic(system, messages, max_tokens=400),
         media_type="text/event-stream",
@@ -565,8 +591,18 @@ def financials(symbol: str):
         return cached
     try:
         import yfinance as yf
+        from concurrent.futures import ThreadPoolExecutor
         t = yf.Ticker(symbol.strip().upper())
-        fin = t.quarterly_financials
+        # quarterly_financials and stock metrics are independent network
+        # fetches — start both at once
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_fin = pool.submit(lambda: t.quarterly_financials)
+            f_metrics = pool.submit(get_stock_metrics, symbol)
+            fin = f_fin.result()
+            try:
+                metrics = f_metrics.result()
+            except Exception:
+                metrics = {}
         if fin is None or fin.empty:
             return {"quarters": [], "revenue_growth_yoy": None, "profit_margin": None}
 
@@ -593,7 +629,6 @@ def financials(symbol: str):
             if year_ago and year_ago != 0:
                 rev_growth = round((latest - year_ago) / abs(year_ago), 4)
 
-        metrics = get_stock_metrics(symbol)
         result = {
             "quarters": quarters,
             "revenue_growth_yoy": rev_growth,
@@ -815,15 +850,17 @@ async def universe_agent(req: AgentFilterRequest):
     Returns SSE stream. First event contains the structured filter + raw results,
     then tokens stream for the summary.
     """
+    import asyncio
     from core.universe_agent import run_agent_filter, build_summary_system
     from core.metrics import get_market_context
 
     try:
-        filters, results = run_agent_filter(req.query)
+        # Blocking LLM + DB work — run on a worker thread
+        filters, results = await asyncio.to_thread(run_agent_filter, req.query)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    market = get_market_context()
+    market = await asyncio.to_thread(get_market_context)
 
     # First SSE event: structured payload (filters + results list)
     import json as _json
