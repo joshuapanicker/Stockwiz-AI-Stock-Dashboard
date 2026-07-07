@@ -15,10 +15,12 @@ import type { UniverseStock, UniverseFilters } from "../types";
 function CacheStatus() {
   const status = useUniverseStatus();
   if (!status) return null;
+  const src = (status as any).universe_source ?? "US listings";
   return (
-    <div className="flex items-center gap-1.5 text-[10px] text-muted">
+    <div className="flex items-center gap-1.5 text-[10px] text-muted"
+      title={`${(status.total ?? 0).toLocaleString()} US stocks — ${src} (via Yahoo Finance). ${(status.cached ?? 0).toLocaleString()} with cached metrics.`}>
       <Database size={9} />
-      <span>{status.cached}/{status.total}</span>
+      <span>{(status.cached ?? 0).toLocaleString()}/{(status.total ?? 0).toLocaleString()}</span>
       {status.fetching && <RefreshCw size={8} className="animate-spin text-green" />}
     </div>
   );
@@ -295,11 +297,11 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
   const loading = agentLoading || manualLoading;
   const displayResults = filters ? results : defaultResults;
 
-  // Load default top-100 by market cap on mount
+  // Load default top-250 by market cap on mount
   useEffect(() => {
     apiFetch<UniverseStock[]>("/universe/query", {
       method: "POST",
-      body: JSON.stringify({ order_by: "market_cap DESC", limit: 100 }),
+      body: JSON.stringify({ order_by: "market_cap DESC", limit: 250 }),
     }).then(d => {
       setDefaultResults(d);
       if (d.length > 0) onFirstLoad?.(d[0].symbol);
@@ -384,7 +386,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
     setShowFilters(false);
     setFilters(null);
     setConversation([]);
-    const body: Record<string, any> = { order_by: manualF.order_by, limit: 100 };
+    const body: Record<string, any> = { order_by: manualF.order_by, limit: 250 };
     if (manualF.sector) body.sector = manualF.sector;
     if (manualF.max_forward_pe) body.max_forward_pe = parseFloat(manualF.max_forward_pe);
     if (manualF.max_trailing_pe) body.max_trailing_pe = parseFloat(manualF.max_trailing_pe);

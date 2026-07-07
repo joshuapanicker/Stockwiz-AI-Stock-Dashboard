@@ -2,41 +2,54 @@
 Background worker that fetches stock metrics for the full universe
 and stores them in the SQLite universe cache.
 
-Strategy
---------
-- yfinance.download() with a group_by="ticker" batch call is used for price data
-  (much faster than individual Ticker.history() calls per symbol).
-- ticker.info is fetched individually but batched into small groups with a short
-  delay to avoid rate limiting.
-- The fetcher runs as a background thread; it respects an existing stop event so
-  the FastAPI server can shut it down cleanly.
-- Each symbol is only re-fetched when its cached record is older than UNIVERSE_RECORD_TTL.
+Strategy (scaled for the ~6,000-symbol US-listed universe)
+-----------------------------------------------------------
+- Symbols are processed in priority order: the curated large-cap core first,
+  then the full NASDAQ/NYSE/AMEX long tail — so the names users actually
+  look at are populated within the first couple of minutes of a cold start.
+- Work happens in chunks: one yf.download() batch price call per chunk
+  (fast, threaded), then ticker.info fundamentals fetched CONCURRENTLY via a
+  thread pool with a global rate throttle + 429-aware backoff.
+- Everything user-facing reads from SQLite (WAL mode), so a running fetch
+  never blocks or slows API requests.
+- Each symbol is only re-fetched when its cached record is older than
+  UNIVERSE_RECORD_TTL; errored symbols (delisted etc.) retry every 3 days.
 """
 
 from __future__ import annotations
 
 import math
+import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import yfinance as yf
 
 from core.universe_cache import (
     get_universe_symbols,
     get_stale_symbols,
     upsert_stock,
-    UNIVERSE_RECORD_TTL,
 )
+from core.universe_symbols import refresh_universe_symbols
 
-# Batch sizes and rate-limit courtesy delays
-PRICE_BATCH_SIZE = 50       # symbols per yf.download() batch
-INFO_BATCH_SIZE  = 10       # symbols per info-fetch group
-BATCH_DELAY      = 1.5      # seconds between info batches
+# Tunables (env-overridable for the hosted deployment)
+PRICE_BATCH_SIZE = int(os.getenv("UNIVERSE_PRICE_BATCH", "100"))   # symbols per yf.download()
+INFO_WORKERS     = int(os.getenv("UNIVERSE_INFO_WORKERS", "8"))    # concurrent info fetches
+REQ_INTERVAL     = float(os.getenv("UNIVERSE_REQ_INTERVAL", "0.12"))  # min secs between request starts
 FULL_CYCLE_SLEEP = 3600     # re-check for stale data every hour
 
 
 _stop_event = threading.Event()
 _thread: threading.Thread | None = None
 _lock = threading.Lock()
+
+# Global request pacing across worker threads
+_throttle_lock = threading.Lock()
+_last_request_start = 0.0
+
+# When Yahoo rate-limits us, all workers back off until this timestamp
+_backoff_until = 0.0
 
 # Progress tracking (read by the API for status endpoint)
 _progress = {"fetched": 0, "total": 0, "running": False, "last_run": None}
@@ -50,6 +63,26 @@ def _safe(val) -> float | None:
         return None if (math.isnan(f) or math.isinf(f)) else round(f, 4)
     except Exception:
         return None
+
+
+def _throttle() -> None:
+    """Pace request starts globally; honor any active rate-limit backoff."""
+    global _last_request_start
+    while True:
+        with _throttle_lock:
+            now = time.time()
+            wait = max(_backoff_until - now, _last_request_start + REQ_INTERVAL - now)
+            if wait <= 0:
+                _last_request_start = now
+                return
+        if _stop_event.wait(min(wait, 2.0)):
+            return
+
+
+def _note_rate_limit(seconds: float = 30.0) -> None:
+    global _backoff_until
+    with _throttle_lock:
+        _backoff_until = max(_backoff_until, time.time() + seconds)
 
 
 def _fetch_price_batch(symbols: list[str]) -> dict[str, dict]:
@@ -119,49 +152,51 @@ def _fetch_price_batch(symbols: list[str]) -> dict[str, dict]:
     return results
 
 
-def _fetch_info_batch(symbols: list[str], price_data: dict[str, dict]) -> None:
-    """
-    For each symbol in the batch, merge ticker.info fundamentals with price_data
-    and upsert into SQLite.
-    """
-    for symbol in symbols:
-        if _stop_event.is_set():
-            return
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info or {}
+def _fetch_one_info(symbol: str, price_data: dict[str, dict]) -> None:
+    """Fetch fundamentals for one symbol (runs on a worker thread) and upsert."""
+    if _stop_event.is_set():
+        return
+    _throttle()
+    if _stop_event.is_set():
+        return
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info or {}
 
-            base = price_data.get(symbol, {"symbol": symbol})
+        base = price_data.get(symbol, {"symbol": symbol})
 
-            # If price data was missing, try fast_info
-            if not base.get("close_price"):
-                fi = ticker.fast_info
-                price = _safe(fi.get("lastPrice") or fi.get("regularMarketPrice"))
-                if price:
-                    base["close_price"] = price
+        # If price data was missing, try fast_info
+        if not base.get("close_price"):
+            fi = ticker.fast_info
+            price = _safe(fi.get("lastPrice") or fi.get("regularMarketPrice"))
+            if price:
+                base["close_price"] = price
 
-            metrics = {
-                **base,
-                "symbol": symbol,
-                "trailing_pe":      _safe(info.get("trailingPE")),
-                "forward_pe":       _safe(info.get("forwardPE")),
-                "profit_margin":    _safe(info.get("profitMargins")),
-                "operating_margin": _safe(info.get("operatingMargins")),
-                "revenue_growth":   _safe(info.get("revenueGrowth")),
-                "earnings_growth":  _safe(info.get("earningsGrowth")),
-                "market_cap":       _safe(info.get("marketCap")),
-                "sector":           info.get("sector"),
-                "industry":         info.get("industry"),
-            }
+        metrics = {
+            **base,
+            "symbol": symbol,
+            "trailing_pe":      _safe(info.get("trailingPE")),
+            "forward_pe":       _safe(info.get("forwardPE")),
+            "profit_margin":    _safe(info.get("profitMargins")),
+            "operating_margin": _safe(info.get("operatingMargins")),
+            "revenue_growth":   _safe(info.get("revenueGrowth")),
+            "earnings_growth":  _safe(info.get("earningsGrowth")),
+            "market_cap":       _safe(info.get("marketCap")),
+            "sector":           info.get("sector"),
+            "industry":         info.get("industry"),
+        }
 
-            upsert_stock(metrics, error=None)
+        upsert_stock(metrics, error=None)
 
-        except Exception as e:
-            # Mark symbol as errored but don't break the batch
-            upsert_stock({"symbol": symbol}, error=str(e)[:200])
+    except Exception as e:
+        msg = str(e)[:200]
+        if "429" in msg or "Too Many Requests" in msg:
+            _note_rate_limit()
+        # Mark symbol as errored but don't break the cycle
+        upsert_stock({"symbol": symbol}, error=msg)
 
-        with _lock:
-            _progress["fetched"] += 1
+    with _lock:
+        _progress["fetched"] += 1
 
 
 def run_fetch_cycle(symbols: list[str] | None = None, force: bool = False) -> None:
@@ -169,6 +204,12 @@ def run_fetch_cycle(symbols: list[str] | None = None, force: bool = False) -> No
     Fetch data for stale (or all forced) symbols in the universe.
     Runs synchronously — call from a background thread.
     """
+    # Keep the symbol universe itself fresh (weekly listing-directory refresh)
+    try:
+        refresh_universe_symbols()
+    except Exception:
+        pass
+
     if symbols is None:
         symbols = get_stale_symbols() if not force else get_universe_symbols()
 
@@ -181,21 +222,19 @@ def run_fetch_cycle(symbols: list[str] | None = None, force: bool = False) -> No
         _progress["fetched"] = 0
 
     try:
-        # Step 1: batch price download in chunks of PRICE_BATCH_SIZE
-        price_data: dict[str, dict] = {}
-        for i in range(0, len(symbols), PRICE_BATCH_SIZE):
-            if _stop_event.is_set():
-                break
-            batch = symbols[i: i + PRICE_BATCH_SIZE]
-            price_data.update(_fetch_price_batch(batch))
+        # Process chunk by chunk in priority order so high-interest symbols
+        # land in the cache first: batch price download, then parallel info.
+        with ThreadPoolExecutor(max_workers=INFO_WORKERS, thread_name_prefix="universe-info") as pool:
+            for i in range(0, len(symbols), PRICE_BATCH_SIZE):
+                if _stop_event.is_set():
+                    break
+                chunk = symbols[i: i + PRICE_BATCH_SIZE]
+                price_data = _fetch_price_batch(chunk)
 
-        # Step 2: fetch info in smaller chunks (rate-limit friendly)
-        for i in range(0, len(symbols), INFO_BATCH_SIZE):
-            if _stop_event.is_set():
-                break
-            batch = symbols[i: i + INFO_BATCH_SIZE]
-            _fetch_info_batch(batch, price_data)
-            time.sleep(BATCH_DELAY)
+                futures = [pool.submit(_fetch_one_info, s, price_data) for s in chunk]
+                for f in as_completed(futures):
+                    if _stop_event.is_set():
+                        break
 
     finally:
         with _lock:

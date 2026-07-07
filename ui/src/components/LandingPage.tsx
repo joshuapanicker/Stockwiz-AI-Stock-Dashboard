@@ -392,7 +392,7 @@ export default function LandingPage() {
 
             <FadeIn direction="up" delay={260}>
               <p className="text-white/55 text-lg leading-relaxed max-w-md mb-8">
-                Live market data meets Claude AI — screen 500+ stocks,
+                Live market data meets Claude AI — screen 5,700+ US stocks,
                 surface buy signals, and get plain-English analysis on any position.
               </p>
             </FadeIn>
@@ -462,7 +462,7 @@ export default function LandingPage() {
           <div className="bg-card/60 border border-border/40 rounded-2xl px-8 py-6 backdrop-blur-sm">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 divide-x divide-border/30">
               {[
-                { to: 500, suffix: "+", label: "Stocks in universe" },
+                { to: 5700, suffix: "+", label: "Stocks in universe" },
                 { to: 4,   suffix: "",  label: "Strategy presets" },
                 { to: 6,   suffix: "",  label: "Chart types" },
                 { to: 3,   suffix: "",  label: "AI chat modes" },
@@ -496,7 +496,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
             { step: "01", title: "Set your criteria", desc: "Pick a strategy preset — Value, Growth, Momentum, Conservative — or build your own rules with the visual editor.", delay: 0 },
-            { step: "02", title: "Scan the universe", desc: "StockWiz evaluates 500+ stocks against your criteria and surfaces the ones worth watching — no manual research needed.", delay: 120 },
+            { step: "02", title: "Scan the universe", desc: "StockWiz evaluates 5,700+ US stocks — every NASDAQ, NYSE & AMEX listing — against your criteria and surfaces the ones worth watching.", delay: 120 },
             { step: "03", title: "Get AI analysis", desc: "Click any stock and Claude AI gives you plain-English reasoning based on live data injected at request time.", delay: 240 },
           ].map(({ step, title, desc, delay }) => (
             <FadeIn key={step} direction="up" delay={delay}>
@@ -549,7 +549,7 @@ export default function LandingPage() {
               <p className="text-3xl font-mono font-black text-white mb-1">$0<span className="text-muted text-sm font-normal">/mo</span></p>
               <p className="text-muted text-xs mb-5">Full dashboard, always free</p>
               <div className="space-y-2 mb-6">
-                {["Stock Search Engine (500+ stocks)", "AI criteria builder + presets", "Portfolio tracker with P&L", "Live market data", "Volume Profile charts", "AI analysis + chat"].map(f => (
+                {["Stock Search Engine (5,700+ US stocks)", "AI criteria builder + presets", "Portfolio tracker with P&L", "Live market data", "Volume Profile charts", "AI analysis + chat"].map(f => (
                   <div key={f} className="flex items-center gap-2 text-xs text-white/70">
                     <div className="w-4 h-4 rounded-full bg-green/15 flex items-center justify-center flex-shrink-0">
                       <CheckCircle size={9} className="text-green" />
