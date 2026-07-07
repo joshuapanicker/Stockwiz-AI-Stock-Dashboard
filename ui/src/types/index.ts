@@ -82,6 +82,19 @@ export interface HoldingWithMetrics extends Holding {
   history: { date: string; close: number }[];
 }
 
+export interface SoldPosition {
+  id: string;
+  symbol: string;
+  sell_date: string;
+  sell_price: number;
+  shares: number;
+  buy_price: number | null;
+  buy_date: string | null;
+  realized_gain: number | null;
+  realized_pct: number | null;
+  created_at: string;
+}
+
 export interface AnalysisResult {
   symbol: string;
   action: string;
