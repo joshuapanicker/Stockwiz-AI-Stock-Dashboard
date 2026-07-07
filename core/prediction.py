@@ -8,11 +8,7 @@ from datetime import datetime, timedelta
 from core.metrics import get_stock_metrics, get_price_history, get_market_context
 
 
-def predict_stock(symbol: str) -> dict:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set.")
-
+def predict_stock(symbol: str, user_id: str | None = None) -> dict:
     metrics = get_stock_metrics(symbol)
     market = get_market_context()
     history = get_price_history(symbol, "6mo")
@@ -52,8 +48,9 @@ def predict_stock(symbol: str) -> dict:
         f'"summary": "one sentence explanation"}}'
     )
 
-    client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
+    from core.credits import metered_create
+    response = metered_create(
+        user_id,
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],

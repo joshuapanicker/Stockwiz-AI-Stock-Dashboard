@@ -98,7 +98,7 @@ function AuthForm() {
     } else {
       const { error } = await signUp(email, password);
       if (error) setError(error);
-      else { setSuccess("Account created! Check your email to confirm, then sign in."); setMode("login"); }
+      else { setSuccess("Account created! You're signed in."); setMode("login"); }
     }
     setLoading(false);
   }

@@ -63,14 +63,11 @@ Examples:
 """
 
 
-def extract_filters(query: str) -> dict:
+def extract_filters(query: str, user_id: str | None = None) -> dict:
     """Call Claude to parse a natural language query into structured filter params."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
-
-    client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
+    from core.credits import metered_create
+    response = metered_create(
+        user_id,
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
         system=EXTRACTION_SYSTEM,
@@ -133,12 +130,12 @@ def build_summary_system(filters: dict, results: list[dict], market: dict) -> st
     return f"{SUMMARY_SYSTEM}\n\n{context}"
 
 
-def run_agent_filter(query: str) -> tuple[dict, list[dict]]:
+def run_agent_filter(query: str, user_id: str | None = None) -> tuple[dict, list[dict]]:
     """
     Extract filters from query, run the universe query, return (filters, results).
     This is the non-streaming part — call before streaming the summary.
     """
-    filters = extract_filters(query)
+    filters = extract_filters(query, user_id=user_id)
 
     results = query_universe(
         sector=filters.get("sector"),

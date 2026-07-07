@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "../lib/supabase";
-import { setAuthToken } from "../hooks/useApi";
+import { setAuthToken, API_BASE } from "../hooks/useApi";
 import type { User, Session } from "../lib/supabase";
 
 interface AuthContextValue {
@@ -40,7 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.session) {
+      // Fire-and-forget: notify the host. Uses the fresh session token
+      // directly since the module-level cached token may not be set yet.
+      fetch(`${API_BASE}/internal/notify-signin`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      }).catch(() => {});
+    }
     return { error: error?.message ?? null };
   }
 

@@ -52,7 +52,8 @@ Reasoning:
 Rules: use only provided data, say "missing" if absent, max 3 bullets."""
 
 
-def analyze_stock(symbol: str, action: str, gain_pct: float | None = None) -> dict:
+def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
+                  user_id: str | None = None) -> dict:
     from concurrent.futures import ThreadPoolExecutor
     from core.cache import get as cache_get, set as cache_set
     cache_key = f"analysis:{symbol}:{action}:{gain_pct}"
@@ -74,13 +75,11 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None) -> di
             news_ctx = ""
     criteria_result = evaluate_criteria(action, metrics, market, gain_pct=gain_pct)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set.")
+    from core.credits import metered_create
 
     prompt = _build_prompt(symbol, action, criteria_result, metrics, market, news_ctx)
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
+    message = metered_create(
+        user_id,
         model="claude-haiku-4-5-20251001",
         max_tokens=300,
         system=(

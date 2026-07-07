@@ -5,11 +5,13 @@ import {
   Briefcase, Shield, Bell, Settings, ChevronRight, CircleDollarSign,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useCredits } from "../hooks/useApi";
+import type { SettingsTab } from "./SettingsPage";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onOpenSettings: (tab?: "profile" | "criteria" | "notifications" | "brokerage" | "security") => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   portfolioStats?: {
     holdings: number;
     netPnl: number | null;
@@ -56,6 +58,7 @@ function MenuRow({ icon, label, sub, onClick, danger }: {
 
 export default function ProfilePanel({ open, onClose, onOpenSettings, portfolioStats }: Props) {
   const { user, signOut } = useAuth();
+  const { data: credits } = useCredits();
 
   // Close on Escape
   useEffect(() => {
@@ -195,18 +198,49 @@ export default function ProfilePanel({ open, onClose, onOpenSettings, portfolioS
             />
           </div>
 
-          {/* Plan */}
+          {/* AI Credits */}
           <div className="py-2 border-b border-border/40">
-            <p className="text-[10px] text-muted uppercase tracking-wider px-5 py-2">Plan</p>
-            <div className="mx-4 my-1 bg-green/5 border border-green/20 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-white text-sm font-semibold">Free Tier</p>
-                <p className="text-muted text-xs mt-0.5">Full dashboard access</p>
-              </div>
-              <div className="bg-green/15 text-green text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                Active
-              </div>
-            </div>
+            <p className="text-[10px] text-muted uppercase tracking-wider px-5 py-2">AI Credits</p>
+            <button onClick={() => { onClose(); onOpenSettings("credits"); }}
+              className="w-full text-left mx-4 my-1 bg-card2 border border-border/40 rounded-xl px-4 py-3 hover:border-green/30 transition-colors"
+              style={{ width: "calc(100% - 2rem)" }}>
+              {!credits ? (
+                <p className="text-muted text-xs">Loading...</p>
+              ) : credits.has_own_key ? (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white text-sm font-semibold">Own API Key</p>
+                    <p className="text-muted text-xs mt-0.5">Unmetered usage</p>
+                  </div>
+                  <div className="bg-green/15 text-green text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                    Active
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-white text-sm font-semibold">Free Tier</p>
+                    <span className={clsx(
+                      "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                      credits.exhausted ? "bg-red/15 text-red"
+                        : credits.warning ? "bg-amber-500/15 text-amber-400"
+                        : "bg-green/15 text-green"
+                    )}>
+                      {credits.exhausted ? "Exhausted" : credits.warning ? "Low" : "Active"}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                    <div className={clsx(
+                      "h-full rounded-full transition-all",
+                      credits.exhausted ? "bg-red" : credits.warning ? "bg-amber-400" : "bg-green"
+                    )} style={{ width: `${Math.min(credits.pct_used * 100, 100)}%` }} />
+                  </div>
+                  <p className="text-muted text-[10px] mt-1.5">
+                    {credits.tokens_used.toLocaleString()} / {credits.token_limit.toLocaleString()} tokens this month
+                  </p>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Sign out */}

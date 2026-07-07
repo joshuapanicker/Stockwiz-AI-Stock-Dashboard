@@ -3,7 +3,7 @@ import { Send, Bot, User } from "lucide-react";
 import clsx from "clsx";
 import PredictionChart from "./PredictionChart";
 import TypewriterMessage from "./TypewriterMessage";
-import { apiFetch, API_BASE, getAuthHeaders } from "../hooks/useApi";
+import { apiFetch, API_BASE, getAuthHeaders, parseApiError } from "../hooks/useApi";
 
 interface Message {
   role: "user" | "assistant";
@@ -30,7 +30,7 @@ async function streamChat(symbol: string, messages: Message[], onToken: (t: stri
     body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
     signal,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw await parseApiError(res);
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -79,7 +79,8 @@ export default function StockChat({ symbol, currentPrice = 0 }: Props) {
           prediction: pred,
         }]);
       } catch (e: any) {
-        setMessages([...next, { role: "assistant", content: `Error: ${e.message}` }]);
+        const content = e.code === "credits_exhausted" ? e.message : `Error: ${e.message}`;
+        setMessages([...next, { role: "assistant", content }]);
       } finally {
         setStreaming(false);
       }
@@ -103,7 +104,8 @@ export default function StockChat({ symbol, currentPrice = 0 }: Props) {
       }, abortRef.current.signal);
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: `Error: ${e.message}` }; return u; });
+        const content = e.code === "credits_exhausted" ? e.message : `Error: ${e.message}`;
+        setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content }; return u; });
       }
     } finally {
       setStreaming(false);

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2 } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2, AlertTriangle, Trash2, Zap, Eye, EyeOff, KeyRound } from "lucide-react";
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
 import AlertsEditor from "./AlertsEditor";
 import PlaidConnect from "./PlaidConnect";
-import { apiFetch, useProfile } from "../hooks/useApi";
+import { apiFetch, useProfile, useCredits } from "../hooks/useApi";
+import { useAuth } from "../context/AuthContext";
 
-type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security";
+export type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security" | "credits";
 
 interface Props {
   open: boolean;
@@ -20,6 +21,7 @@ const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "criteria",      label: "Screening Criteria", icon: <SlidersHorizontal size={14} /> },
   { id: "notifications", label: "Alerts",             icon: <Bell size={14} /> },
   { id: "brokerage",     label: "Brokerage",          icon: <Building2 size={14} /> },
+  { id: "credits",       label: "AI Credits",         icon: <Zap size={14} /> },
   { id: "security",      label: "Security",           icon: <Shield size={14} /> },
 ];
 
@@ -154,6 +156,184 @@ function ProfileEditor() {
     </div>
   );
 }
+// ── AI Credits ─────────────────────────────────────────────────────────────
+
+function AiCreditsSection() {
+  const { data: credits, loading, setKey, removeKey, keyError, savingKey } = useCredits();
+  const [keyInput, setKeyInput] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
+  async function handleSetKey(e: React.FormEvent) {
+    e.preventDefault();
+    const ok = await setKey(keyInput.trim());
+    if (ok) setKeyInput("");
+  }
+
+  async function handleRemoveKey() {
+    setRemoving(true);
+    try { await removeKey(); }
+    finally { setRemoving(false); }
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <h2 className="text-white font-bold text-xl mb-2">AI Credits</h2>
+      <p className="text-muted text-sm mb-8">
+        Every account gets a free monthly allowance of Claude AI usage — used for stock analysis, chat,
+        predictions, and natural-language search. Add your own Anthropic API key for unlimited, unmetered usage.
+      </p>
+
+      {loading || !credits ? (
+        <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-8 text-center text-muted text-sm">
+          Loading usage...
+        </div>
+      ) : credits.has_own_key ? (
+        <div className="bg-green/5 border border-green/20 rounded-2xl px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-green/15 text-green flex items-center justify-center flex-shrink-0">
+                <KeyRound size={16} />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">Using your own API key</p>
+                <p className="text-muted text-xs mt-0.5">Unmetered — billed directly to your Anthropic account</p>
+              </div>
+            </div>
+            <button onClick={handleRemoveKey} disabled={removing}
+              className="text-xs font-semibold text-muted hover:text-red disabled:opacity-40 transition-colors px-3 py-2">
+              {removing ? "Removing..." : "Remove"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-5 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-white font-semibold text-sm">
+                {credits.tokens_used.toLocaleString()} / {credits.token_limit.toLocaleString()} tokens used
+              </p>
+              <span className={clsx(
+                "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                credits.exhausted ? "bg-red/15 text-red"
+                  : credits.warning ? "bg-amber-500/15 text-amber-400"
+                  : "bg-green/15 text-green"
+              )}>
+                {credits.exhausted ? "Exhausted" : credits.warning ? "Running low" : "Active"}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+              <div className={clsx(
+                "h-full rounded-full transition-all",
+                credits.exhausted ? "bg-red" : credits.warning ? "bg-amber-400" : "bg-green"
+              )} style={{ width: `${Math.min(credits.pct_used * 100, 100)}%` }} />
+            </div>
+            <p className="text-muted text-xs mt-3">
+              Resets monthly ({credits.period}).
+              {credits.exhausted && " You're out of free credits — AI features are paused until next month or you add your own key below."}
+              {!credits.exhausted && credits.warning && " You're close to your monthly limit."}
+            </p>
+          </div>
+
+          <form onSubmit={handleSetKey} className="bg-card2 rounded-2xl border border-border/40 px-6 py-5">
+            <p className="text-white font-semibold text-sm mb-1">Add your own Anthropic API key</p>
+            <p className="text-muted text-xs mb-4">
+              Get one at <span className="text-white/70">console.anthropic.com</span>. Your key is stored securely
+              and never shown again after saving.
+            </p>
+            <div className="flex items-center gap-2 bg-bg border border-border rounded-xl px-3 py-2.5 focus-within:border-green/40 transition-colors mb-3">
+              <input
+                type={showKey ? "text" : "password"}
+                value={keyInput}
+                onChange={e => setKeyInput(e.target.value)}
+                placeholder="sk-ant-..."
+                autoComplete="off"
+                className="flex-1 bg-transparent text-sm text-white placeholder-muted focus:outline-none font-mono" />
+              <button type="button" onClick={() => setShowKey(v => !v)}
+                className="text-muted hover:text-white transition-colors flex-shrink-0">
+                {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            {keyError && <p className="text-red text-xs mb-3">{keyError}</p>}
+            <button type="submit" disabled={!keyInput.trim() || savingKey}
+              className="flex items-center gap-2 text-xs font-semibold text-green bg-green/10 hover:bg-green/20 disabled:opacity-40 disabled:cursor-not-allowed border border-green/20 rounded-lg px-4 py-2.5 transition-colors">
+              {savingKey ? <><RefreshCw size={13} className="animate-spin" /> Validating...</> : "Save key"}
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Delete account ────────────────────────────────────────────────────────
+
+function DeleteAccountSection() {
+  const { signOut } = useAuth();
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setError(null);
+    try {
+      await apiFetch("/account", { method: "DELETE" });
+      await signOut();
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to delete account");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="bg-red/5 rounded-2xl border border-red/20 px-6 py-6 mt-6">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-xl bg-red/10 text-red flex items-center justify-center flex-shrink-0">
+          <AlertTriangle size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-white font-semibold text-sm">Delete Account</p>
+          <p className="text-muted text-xs mt-1 mb-4">
+            Permanently deletes your account, portfolio holdings, alerts, criteria,
+            brokerage connections, and AI usage data. This cannot be undone.
+          </p>
+
+          {!confirming ? (
+            <button onClick={() => setConfirming(true)}
+              className="flex items-center gap-2 text-xs font-semibold text-red bg-red/10 hover:bg-red/20 border border-red/20 rounded-lg px-3 py-2 transition-colors">
+              <Trash2 size={13} /> Delete my account
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-white text-xs">
+                Type <span className="font-mono font-bold">DELETE</span> to confirm.
+              </p>
+              <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                className="w-full bg-card2 border border-red/30 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-red/60" />
+              {error && <p className="text-red text-xs">{error}</p>}
+              <div className="flex gap-2">
+                <button onClick={handleDelete} disabled={confirmText !== "DELETE" || deleting}
+                  className="flex items-center gap-2 text-xs font-semibold text-white bg-red hover:bg-red/90 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-3 py-2 transition-colors">
+                  {deleting ? <><RefreshCw size={13} className="animate-spin" /> Deleting...</> : "Permanently delete"}
+                </button>
+                <button onClick={() => { setConfirming(false); setConfirmText(""); setError(null); }}
+                  disabled={deleting}
+                  className="text-xs font-semibold text-muted hover:text-white px-3 py-2 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage({ open, onClose, initialTab = "criteria", onPortfolioSync }: Props) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [criteria, setCriteria] = useState<CriteriaConfig | null>(null);
@@ -281,11 +461,14 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
             </div>
           )}
 
-          {/* ── Security (stub) ── */}
+          {/* ── AI Credits ── */}
+          {activeTab === "credits" && <AiCreditsSection />}
+
+          {/* ── Security ── */}
           {activeTab === "security" && (
             <div className="max-w-2xl">
               <h2 className="text-white font-bold text-xl mb-2">Security</h2>
-              <p className="text-muted text-sm mb-8">Manage your password and active sessions.</p>
+              <p className="text-muted text-sm mb-8">Manage your password and account.</p>
               <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-8 flex flex-col items-center gap-3 text-center">
                 <Shield size={28} className="text-muted" />
                 <p className="text-white font-semibold">Coming Soon</p>
@@ -293,6 +476,7 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
                   Password reset and session management will be available in a future update.
                 </p>
               </div>
+              <DeleteAccountSection />
             </div>
           )}
         </div>

@@ -21,6 +21,30 @@ export function getAuthHeaders(): Record<string, string> {
   return _cachedToken ? { Authorization: `Bearer ${_cachedToken}` } : {};
 }
 
+export interface ApiError extends Error {
+  code?: string;
+  status?: number;
+}
+
+export const CREDITS_EXHAUSTED_MESSAGE =
+  "You've used all your free AI credits for this month. Add your own Anthropic API key in Settings → AI Credits to keep using AI features.";
+
+/** Parse a non-ok response body into a friendly Error with .code/.status set. */
+export async function parseApiError(res: Response): Promise<ApiError> {
+  const raw = await res.text();
+  let message = raw || res.statusText;
+  let code: string | undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.detail) message = parsed.detail;
+    if (parsed?.code) code = parsed.code;
+  } catch { /* not JSON — use raw text */ }
+  const err = new Error(message) as ApiError;
+  err.code = code;
+  err.status = res.status;
+  return err;
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (_cachedToken) headers["Authorization"] = `Bearer ${_cachedToken}`;
@@ -29,10 +53,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: { ...headers, ...(options?.headers ?? {}) },
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || res.statusText);
-  }
+  if (!res.ok) throw await parseApiError(res);
   return res.json() as Promise<T>;
 }
 
@@ -318,6 +339,64 @@ export function useUniverseSectors() {
 }
 
 export { apiFetch };
+
+export interface CreditsStatus {
+  has_own_key: boolean;
+  metered: boolean;
+  tokens_used: number;
+  token_limit: number;
+  remaining: number;
+  pct_used: number;
+  warning: boolean;
+  exhausted: boolean;
+  period: string;
+}
+
+export function useCredits() {
+  const [data, setData] = useState<CreditsStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [savingKey, setSavingKey] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await apiFetch<CreditsStatus>("/credits");
+      setData(result);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const setKey = useCallback(async (apiKey: string) => {
+    setKeyError(null);
+    setSavingKey(true);
+    try {
+      const result = await apiFetch<CreditsStatus>("/credits/key", {
+        method: "POST",
+        body: JSON.stringify({ api_key: apiKey }),
+      });
+      setData(result);
+      return true;
+    } catch (e: any) {
+      setKeyError(e.message ?? "Failed to save key");
+      return false;
+    } finally {
+      setSavingKey(false);
+    }
+  }, []);
+
+  const removeKey = useCallback(async () => {
+    const result = await apiFetch<CreditsStatus>("/credits/key", { method: "DELETE" });
+    setData(result);
+  }, []);
+
+  return { data, loading, refresh, setKey, removeKey, keyError, savingKey };
+}
 
 export function useSoldPositions() {
   const [data, setData] = useState<any[]>([]);

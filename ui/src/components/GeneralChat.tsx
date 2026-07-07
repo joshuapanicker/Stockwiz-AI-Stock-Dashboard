@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, User, Plus, MessageSquare, Trash2, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { apiFetch, API_BASE, getAuthHeaders } from "../hooks/useApi";
+import { apiFetch, API_BASE, getAuthHeaders, parseApiError } from "../hooks/useApi";
 import TypewriterMessage from "./TypewriterMessage";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -47,7 +47,7 @@ async function streamChat(url: string, messages: Message[], onToken: (t: string)
     body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
     signal,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw await parseApiError(res);
   const reader = res.body!.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -124,7 +124,8 @@ export default function GeneralChat() {
       }
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: `Error: ${e.message}` }; return u; });
+        const content = e.code === "credits_exhausted" ? e.message : `Error: ${e.message}`;
+        setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content }; return u; });
       }
     } finally {
       setStreaming(false);

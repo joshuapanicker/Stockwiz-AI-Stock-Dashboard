@@ -56,6 +56,26 @@ def delete_holding(user_id: str, symbol: str) -> bool:
     return bool(res.data)
 
 
+def get_user_email(user_id: str) -> str | None:
+    try:
+        res = get_client().auth.admin.get_user_by_id(user_id)
+        return res.user.email if res and res.user else None
+    except Exception:
+        return None
+
+
+def delete_user_account(user_id: str) -> None:
+    """
+    Permanently delete a user and all their data.
+
+    Every user-owned table (portfolios, sold_positions, user_alerts,
+    user_criteria, user_profiles, plaid_connections, user_ai_usage,
+    user_api_keys) references auth.users(id) with ON DELETE CASCADE, so
+    removing the auth user cleans up everything else automatically.
+    """
+    get_client().auth.admin.delete_user(user_id)
+
+
 # ── Sold positions ─────────────────────────────────────────────────────────
 
 def record_sale(user_id: str, symbol: str, sell_date: str,

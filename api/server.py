@@ -18,7 +18,7 @@ if _env_file.exists():
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -53,6 +53,17 @@ async def global_exception_handler(request, exc):
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
+
+from core.credits import CreditsExhausted
+
+@app.exception_handler(CreditsExhausted)
+async def credits_exhausted_handler(request, exc):
+    return JSONResponse(
+        status_code=402,
+        content={"detail": str(exc), "code": "credits_exhausted"},
         headers={"Access-Control-Allow-Origin": "*"},
     )
 
@@ -195,7 +206,9 @@ def stock_metrics(symbol: str):
 @app.get("/api/analyze/{symbol}")
 def analyze(symbol: str, action: str = "buy", user_id: str = Depends(get_current_user)):
     try:
-        return analyze_stock(symbol, action)
+        return analyze_stock(symbol, action, user_id=user_id)
+    except CreditsExhausted:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -206,7 +219,9 @@ def analyze(symbol: str, action: str = "buy", user_id: str = Depends(get_current
 def predict(symbol: str, user_id: str = Depends(get_current_user)):
     try:
         from core.prediction import predict_stock
-        return predict_stock(symbol)
+        return predict_stock(symbol, user_id=user_id)
+    except CreditsExhausted:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -219,10 +234,18 @@ def _sse(text: str) -> str:
     import json
     return f"data: {json.dumps({'token': text})}\n\n"
 
-def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400):
-    """Generator that yields SSE tokens from Anthropic streaming API."""
-    import anthropic, os
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400,
+                      user_id: str | None = None,
+                      key_info: tuple[str, bool] | None = None):
+    """Generator that yields SSE tokens from Anthropic streaming API.
+
+    Endpoints must call resolve_api_key(user_id) BEFORE returning the
+    StreamingResponse (and pass it as key_info) so an exhausted user gets a
+    clean 402 instead of a broken stream.
+    """
+    import anthropic
+    from core.credits import resolve_api_key, add_tokens_used
+    api_key, metered = key_info if key_info else resolve_api_key(user_id)
     client = anthropic.Anthropic(api_key=api_key)
     with client.messages.stream(
         model="claude-haiku-4-5-20251001",
@@ -232,6 +255,12 @@ def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400):
     ) as stream:
         for text in stream.text_stream:
             yield _sse(text)
+        if metered and user_id:
+            try:
+                usage = stream.get_final_message().usage
+                add_tokens_used(user_id, usage.input_tokens + usage.output_tokens)
+            except Exception:
+                pass
     yield "data: [DONE]\n\n"
 
 
@@ -239,11 +268,14 @@ def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400):
 async def general_chat_endpoint(req: ChatRequest, user_id: str = Depends(get_current_user)):
     import asyncio
     from core.general_chat import build_system
+    from core.credits import resolve_api_key
+    key_info = resolve_api_key(user_id)  # raises 402 before the stream starts
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
     # build_system does blocking network I/O — keep it off the event loop
     system = await asyncio.to_thread(build_system, messages)
     return StreamingResponse(
-        _stream_anthropic(system, messages, max_tokens=400),
+        _stream_anthropic(system, messages, max_tokens=400,
+                          user_id=user_id, key_info=key_info),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -252,11 +284,10 @@ async def general_chat_endpoint(req: ChatRequest, user_id: str = Depends(get_cur
 @app.post("/api/chat/title")
 async def generate_title(req: ChatRequest, user_id: str = Depends(get_current_user)):
     try:
-        import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-        client = anthropic.Anthropic(api_key=api_key)
+        from core.credits import metered_create
         convo = "\n".join(f"{m.role}: {m.content[:200]}" for m in req.messages[:4])
-        response = client.messages.create(
+        response = metered_create(
+            user_id,
             model="claude-haiku-4-5-20251001",
             max_tokens=20,
             messages=[{"role": "user", "content": f"Give a 4-word max title for this conversation. No quotes, no punctuation:\n{convo}"}],
@@ -271,11 +302,14 @@ async def chat_endpoint(symbol: str, req: ChatRequest,
                         user_id: str = Depends(get_current_user)):
     import asyncio
     from core.chat import build_system as build_stock_system
+    from core.credits import resolve_api_key
+    key_info = resolve_api_key(user_id)  # raises 402 before the stream starts
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
     # build_system fetches metrics/news over the network — keep it off the event loop
     system = await asyncio.to_thread(build_stock_system, symbol, messages, user_id=user_id)
     return StreamingResponse(
-        _stream_anthropic(system, messages, max_tokens=400),
+        _stream_anthropic(system, messages, max_tokens=400,
+                          user_id=user_id, key_info=key_info),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -861,6 +895,82 @@ def universe_query(req: UniverseQueryRequest):
     return results
 
 
+# ── AI credits ────────────────────────────────────────────────────────────
+
+class ApiKeyRequest(BaseModel):
+    api_key: str
+
+
+@app.get("/api/credits")
+def get_credits(user_id: str = Depends(get_current_user)):
+    from core.credits import credits_status
+    return credits_status(user_id)
+
+
+@app.post("/api/credits/key")
+def set_credits_key(req: ApiKeyRequest, user_id: str = Depends(get_current_user)):
+    from core.credits import validate_api_key, set_user_api_key, credits_status
+    key = req.api_key.strip()
+    if not validate_api_key(key):
+        raise HTTPException(status_code=400,
+                            detail="That key doesn't look valid. It should start with sk-ant- "
+                                   "and be active at console.anthropic.com.")
+    set_user_api_key(user_id, key)
+    return credits_status(user_id)
+
+
+@app.delete("/api/credits/key")
+def delete_credits_key(user_id: str = Depends(get_current_user)):
+    from core.credits import delete_user_api_key, credits_status
+    delete_user_api_key(user_id)
+    return credits_status(user_id)
+
+
+# ── Account ───────────────────────────────────────────────────────────────
+
+@app.delete("/api/account")
+def delete_account(user_id: str = Depends(get_current_user)):
+    """Permanently delete the authenticated user and all their data."""
+    from core.db import delete_user_account
+    try:
+        delete_user_account(user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"deleted": True}
+
+
+# ── Signup notification webhook (called by Supabase, not the app) ─────────
+# Configure in Supabase → Database → Webhooks: fire on INSERT to auth.users,
+# POST to {RAILWAY_URL}/api/internal/hooks/new-user, with a custom header
+# "X-Webhook-Secret: <SIGNUP_WEBHOOK_SECRET>" matching the Railway env var.
+
+@app.post("/api/internal/hooks/new-user")
+async def new_user_hook(request: Request):
+    secret = os.environ.get("SIGNUP_WEBHOOK_SECRET", "").strip()
+    if not secret or request.headers.get("x-webhook-secret") != secret:
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+    body = await request.json()
+    record = body.get("record", {})
+    email = record.get("email", "unknown")
+    created_at = record.get("created_at")
+
+    from core.notify import send_signup_notification
+    send_signup_notification(email, created_at)
+    return {"ok": True}
+
+
+@app.post("/api/internal/notify-signin")
+def notify_signin(user_id: str = Depends(get_current_user)):
+    """Called by the client right after a successful sign-in."""
+    from core.db import get_user_email
+    from core.notify import send_signin_notification, NOTIFY_EMAIL
+    email = get_user_email(user_id)
+    if email and email.lower() != NOTIFY_EMAIL.lower():
+        send_signin_notification(email)
+    return {"ok": True}
+
+
 class AgentFilterRequest(BaseModel):
     query: str
     messages: list[ChatMessage] = []
@@ -876,10 +986,15 @@ async def universe_agent(req: AgentFilterRequest, user_id: str = Depends(get_cur
     import asyncio
     from core.universe_agent import run_agent_filter, build_summary_system
     from core.metrics import get_market_context
+    from core.credits import resolve_api_key
+
+    key_info = resolve_api_key(user_id)  # raises 402 before any AI work
 
     try:
         # Blocking LLM + DB work — run on a worker thread
-        filters, results = await asyncio.to_thread(run_agent_filter, req.query)
+        filters, results = await asyncio.to_thread(run_agent_filter, req.query, user_id)
+    except CreditsExhausted:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -899,7 +1014,8 @@ async def universe_agent(req: AgentFilterRequest, user_id: str = Depends(get_cur
         # Stream the AI summary
         system = build_summary_system(filters, results, market)
         messages = [{"role": "user", "content": req.query}]
-        yield from _stream_anthropic(system, messages, max_tokens=300)
+        yield from _stream_anthropic(system, messages, max_tokens=300,
+                                     user_id=user_id, key_info=key_info)
 
     return StreamingResponse(
         generate(),

@@ -6,7 +6,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import clsx from "clsx";
 import { Send, Bot, RefreshCw, X, SlidersHorizontal, Sparkles, Database, User, ChevronDown, ChevronUp, Settings } from "lucide-react";
-import { apiFetch, useUniverseStatus, useUniverseSectors, API_BASE, getAuthHeaders } from "../hooks/useApi";
+import { apiFetch, useUniverseStatus, useUniverseSectors, API_BASE, getAuthHeaders, parseApiError } from "../hooks/useApi";
 import TickerLogo from "./TickerLogo";
 import type { UniverseStock, UniverseFilters } from "../types";
 
@@ -340,7 +340,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
         body: JSON.stringify({ query: q }),
         signal: abortRef.current.signal,
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw await parseApiError(res);
 
       const reader = res.body!.getReader();
       const dec = new TextDecoder();
@@ -375,7 +375,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
       }
     } catch (e: any) {
       if (e.name !== "AbortError") {
-        const errMsg = `Error: ${e.message}`;
+        const errMsg = e.code === "credits_exhausted" ? e.message : `Error: ${e.message}`;
         setConversation(prev => {
           const updated = [...prev];
           updated[updated.length - 1] = { role: "assistant", content: errMsg };

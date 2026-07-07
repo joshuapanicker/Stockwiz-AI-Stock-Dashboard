@@ -10,9 +10,9 @@ import PortfolioTab from "./components/PortfolioTab";
 import GeneralChat from "./components/GeneralChat";
 import MarketBar from "./components/MarketBar";
 import ProfilePanel from "./components/ProfilePanel";
-import SettingsPage from "./components/SettingsPage";
+import SettingsPage, { type SettingsTab } from "./components/SettingsPage";
 
-import { useScreener, usePriceHistory, usePortfolio, useMarket } from "./hooks/useApi";
+import { useScreener, usePriceHistory, usePortfolio, useMarket, useCredits } from "./hooks/useApi";
 import { usePersistedNumber, makeDragger } from "./hooks/usePersistedNumber";
 import type { ScreenedStock, HoldingWithMetrics } from "./types";
 
@@ -73,8 +73,9 @@ export default function App() {
   const [rightWidth, setRightWidth] = usePersistedNumber("pulse_analysis_right_w", 340);
   const [chartH, setChartH] = usePersistedNumber("pulse_analysis_chart_h", 190);
   const [profileOpen, setProfileOpen] = useState(false);
+  const { data: creditsStatus } = useCredits();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"profile" | "criteria" | "notifications" | "brokerage" | "security">("criteria");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("criteria");
 
   // Hidden chart widgets — persisted so the dashboard layout is user-owned
   const [hiddenSlots, setHiddenSlots] = useState<string[]>(() => {
@@ -88,7 +89,7 @@ export default function App() {
   const hideSlot = (key: string) => setHiddenSlots(prev => [...prev, key]);
   const showSlot = (key: string) => setHiddenSlots(prev => prev.filter(k => k !== key));
 
-  function openSettings(tab: "profile" | "criteria" | "notifications" | "brokerage" | "security" = "criteria") {
+  function openSettings(tab: SettingsTab = "criteria") {
     setSettingsTab(tab);
     setSettingsOpen(true);
   }
@@ -178,6 +179,12 @@ export default function App() {
         className="fixed top-[6px] right-3 z-50 w-9 h-9 rounded-full glass-card border border-border/60 shadow-2xl flex items-center justify-center text-muted hover:text-white hover:border-green/40 transition-all"
         title="Profile">
         <User size={15} />
+        {creditsStatus && !creditsStatus.has_own_key && (creditsStatus.warning || creditsStatus.exhausted) && (
+          <span className={clsx(
+            "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-bg",
+            creditsStatus.exhausted ? "bg-red" : "bg-amber-400"
+          )} title={creditsStatus.exhausted ? "AI credits exhausted" : "AI credits running low"} />
+        )}
       </button>
 
       {/* ── Profile slide-in panel ── */}

@@ -16,6 +16,11 @@ data/portfolio.json
 
 # Universe SQLite DB (auto-populated at runtime)
 data/universe.db
+data/universe.db-shm
+data/universe.db-wal
+
+# Local AI usage tracking (only used when Supabase isn't configured)
+data/ai_usage.json
 
 # Editor
 .vscode/

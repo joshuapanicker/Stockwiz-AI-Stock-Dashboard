@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "ui"],
       "port": 5173
+    },
+    {
+      "name": "stockwiz-api",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "uvicorn", "api.server:app", "--port", "8000"],
+      "port": 8000
     }
   ]
 }
