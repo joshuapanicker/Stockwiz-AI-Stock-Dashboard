@@ -328,6 +328,17 @@ class SellHoldingRequest(BaseModel):
     sell_date: str | None = None  # defaults to today
 
 
+# NOTE: /portfolio/sold must be defined BEFORE /portfolio/{symbol}/sell
+# so FastAPI doesn't match the literal "sold" as a symbol path param.
+@app.get("/api/portfolio/sold")
+def get_sold_positions(user_id: str | None = Depends(get_optional_user)):
+    """Return the user's completed trade history."""
+    if not user_id:
+        return []  # no history for unauthenticated users
+    from core.db import get_sold_positions as db_get_sold
+    return db_get_sold(user_id)
+
+
 @app.post("/api/portfolio/{symbol}/sell")
 def sell_holding(
     symbol: str,
@@ -358,22 +369,12 @@ def sell_holding(
             buy_date=holding.get("buy_date", ""),
         )
     else:
-        # Unauthenticated / dev fallback — just delete
         from core.portfolio import get_holding as file_get_holding, remove_holding as file_remove
         holding = file_get_holding(symbol)
         if not holding:
             raise HTTPException(status_code=404, detail=f"{symbol} not found")
         file_remove(symbol)
         return {"symbol": symbol, "sell_price": req.sell_price, "sell_date": sell_date}
-
-
-@app.get("/api/portfolio/sold")
-def get_sold_positions(user_id: str | None = Depends(get_optional_user)):
-    """Return the user's completed trade history."""
-    if not user_id:
-        return []  # no history for unauthenticated users
-    from core.db import get_sold_positions as db_get_sold
-    return db_get_sold(user_id)
 
 
 # ── Plaid (brokerage sync) ────────────────────────────────────────────────

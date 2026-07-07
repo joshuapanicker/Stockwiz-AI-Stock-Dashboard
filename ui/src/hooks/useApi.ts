@@ -145,8 +145,10 @@ export function usePortfolio() {
         sell_date: sellDate ?? new Date().toISOString().slice(0, 10),
       }),
     });
-    // Remove from local active holdings immediately
+    // Immediately remove from active holdings in local state
     setData(prev => prev.filter((h: any) => h.symbol !== symbol));
+    // Notify sold positions listeners to refresh
+    window.dispatchEvent(new CustomEvent("stockwiz:sold"));
     load();
   }, [load]);
 
@@ -328,6 +330,12 @@ export function useSoldPositions() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Re-fetch whenever a sell completes in usePortfolio
+  useEffect(() => {
+    window.addEventListener("stockwiz:sold", load);
+    return () => window.removeEventListener("stockwiz:sold", load);
+  }, [load]);
 
   return { data, loading, refresh: load };
 }
