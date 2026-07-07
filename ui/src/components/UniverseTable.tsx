@@ -40,6 +40,8 @@ function ActiveFilterBar({ filters, query, onClear }: {
   if (filters?.min_profit_margin != null) pills.push(`Margin ≥ ${(filters.min_profit_margin * 100).toFixed(0)}%`);
   if (filters?.near_52w_low_pct != null) pills.push(`Within ${(filters.near_52w_low_pct * 100).toFixed(0)}% of 52W Low`);
   if (filters?.min_market_cap != null) pills.push(`Cap ≥ $${(filters.min_market_cap / 1e9).toFixed(1)}B`);
+  if (filters?.max_price != null) pills.push(`Price ≤ $${filters.max_price}`);
+  if (filters?.min_price != null) pills.push(`Price ≥ $${filters.min_price}`);
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-green/5 border-b border-green/15 flex-shrink-0">
@@ -65,12 +67,12 @@ function ActiveFilterBar({ filters, query, onClear }: {
 interface ManualF {
   sector: string; max_forward_pe: string; max_trailing_pe: string;
   min_revenue_growth: string; min_profit_margin: string;
-  near_52w_low_pct: string; min_market_cap_b: string; order_by: string;
+  near_52w_low_pct: string; min_market_cap_b: string; max_price: string; order_by: string;
 }
 const DFLT: ManualF = {
   sector: "", max_forward_pe: "", max_trailing_pe: "",
   min_revenue_growth: "", min_profit_margin: "",
-  near_52w_low_pct: "", min_market_cap_b: "", order_by: "market_cap DESC",
+  near_52w_low_pct: "", min_market_cap_b: "", max_price: "", order_by: "market_cap DESC",
 };
 
 function FilterPanel({ sectors, values, onChange, onApply, onClose }: {
@@ -132,6 +134,11 @@ function FilterPanel({ sectors, values, onChange, onApply, onClose }: {
             onChange={e => onChange("min_market_cap_b", e.target.value)} className={inp} />
         </div>
         <div>
+          <label className={lbl}>Max Share Price ($)</label>
+          <input type="number" placeholder="e.g. 100" value={values.max_price}
+            onChange={e => onChange("max_price", e.target.value)} className={inp} />
+        </div>
+        <div>
           <label className={lbl}>Sort by</label>
           <select value={values.order_by} onChange={e => onChange("order_by", e.target.value)} className={inp}>
             <option value="market_cap DESC">Market Cap ↓</option>
@@ -140,6 +147,7 @@ function FilterPanel({ sectors, values, onChange, onApply, onClose }: {
             <option value="profit_margin DESC">Profit Margin ↓</option>
             <option value="distance_to_low_pct ASC">Nearest 52W Low</option>
             <option value="earnings_growth DESC">Earnings Growth ↓</option>
+            <option value="close_price ASC">Share Price ↑ lowest</option>
           </select>
         </div>
       </div>
@@ -394,6 +402,7 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
     if (manualF.min_profit_margin) body.min_profit_margin = parseFloat(manualF.min_profit_margin) / 100;
     if (manualF.near_52w_low_pct) body.near_52w_low_pct = parseFloat(manualF.near_52w_low_pct) / 100;
     if (manualF.min_market_cap_b) body.min_market_cap = parseFloat(manualF.min_market_cap_b) * 1e9;
+    if (manualF.max_price) body.max_price = parseFloat(manualF.max_price);
     try {
       const data = await apiFetch<UniverseStock[]>("/universe/query", { method: "POST", body: JSON.stringify(body) });
       setResults(data);

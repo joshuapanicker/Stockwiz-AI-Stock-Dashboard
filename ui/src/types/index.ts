@@ -115,6 +115,8 @@ export interface UniverseFilters {
   min_earnings_growth?: number | null;
   near_52w_low_pct?: number | null;
   min_market_cap?: number | null;
+  max_price?: number | null;
+  min_price?: number | null;
   limit?: number;
   order_by?: string;
   intent_summary?: string;

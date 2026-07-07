@@ -198,6 +198,8 @@ def query_universe(
     near_52w_low_pct: float | None = None,   # distance_to_low_pct < X
     max_trailing_pe: float | None = None,
     min_earnings_growth: float | None = None,
+    max_price: float | None = None,          # share price ceiling
+    min_price: float | None = None,          # share price floor
     limit: int = 200,
     order_by: str = "market_cap DESC",
 ) -> list[dict]:
@@ -232,6 +234,12 @@ def query_universe(
     if min_earnings_growth is not None:
         clauses.append("earnings_growth IS NOT NULL AND earnings_growth >= ?")
         params.append(min_earnings_growth)
+    if max_price is not None:
+        clauses.append("close_price <= ?")
+        params.append(max_price)
+    if min_price is not None:
+        clauses.append("close_price >= ?")
+        params.append(min_price)
 
     # Whitelist safe order_by columns
     safe_orders = {

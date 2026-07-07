@@ -35,12 +35,18 @@ Return ONLY a valid JSON object with these optional fields (omit fields the user
   "min_earnings_growth": 0.05,      // minimum earnings growth (decimal)
   "near_52w_low_pct": 0.20,         // within X% of 52-week low (e.g. 0.20 = 20%)
   "min_market_cap": 1000000000,     // minimum market cap in dollars
+  "max_price": 100,                 // maximum share price in dollars ("under $100")
+  "min_price": 5,                   // minimum share price in dollars ("above $5", "no penny stocks")
   "limit": 50,                      // max results (default 50, max 250 — use higher limits when the user wants a broad pool)
   "order_by": "market_cap DESC",    // one of: market_cap DESC/ASC, revenue_growth DESC/ASC,
                                     //   forward_pe ASC/DESC, distance_to_low_pct ASC/DESC,
-                                    //   profit_margin DESC/ASC, earnings_growth DESC/ASC
+                                    //   profit_margin DESC/ASC, earnings_growth DESC/ASC,
+                                    //   close_price ASC/DESC
   "intent_summary": "short plain English description of what user wants"
 }
+
+IMPORTANT: "under/below/less than $X" with no other metric named refers to SHARE PRICE
+(max_price), not P/E. "under X PE" or "under X times earnings" refers to P/E.
 
 Valid sector names: Technology, Healthcare, Financial Services, Consumer Cyclical,
 Industrials, Consumer Defensive, Energy, Basic Materials, Real Estate,
@@ -48,6 +54,8 @@ Communication Services, Utilities.
 
 Examples:
 - "show me cheap tech stocks" → {"sector":"Technology","max_forward_pe":20,"intent_summary":"Cheap tech stocks by forward PE"}
+- "tech stocks under $100" → {"sector":"Technology","max_price":100,"order_by":"market_cap DESC","intent_summary":"Technology stocks trading under $100 per share"}
+- "stocks under $20 that are profitable" → {"max_price":20,"min_profit_margin":0.0,"intent_summary":"Profitable stocks under $20 per share"}
 - "profitable healthcare under 30 PE" → {"sector":"Healthcare","max_trailing_pe":30,"min_profit_margin":0.0,"intent_summary":"Profitable healthcare stocks"}
 - "high growth small cap" → {"min_revenue_growth":0.20,"max_market_cap_note":"not supported, skip"}
 - "stocks near 52 week low with positive margins" → {"near_52w_low_pct":0.15,"min_profit_margin":0.0,"order_by":"distance_to_low_pct ASC"}
@@ -88,10 +96,13 @@ def _build_results_context(filters: dict, results: list[dict], market: dict) -> 
     """Build the context block Claude uses to summarize results."""
     intent = filters.get("intent_summary", "your query")
 
+    applied = {k: v for k, v in filters.items() if k not in ("intent_summary",) and v is not None}
     lines = [
         f"User filter intent: {intent}",
+        f"SQL filters actually applied: {json.dumps(applied)}",
         f"Market: {market.get('market_trend','unknown')} | VIX: {_fmt(market.get('vix'),2)} | SPY: ${_fmt(market.get('spy_latest'),2)}",
-        f"Results: {len(results)} stocks matched",
+        f"Results: {len(results)} stocks matched — every one of them already satisfies ALL applied filters. "
+        f"You are shown the top {min(len(results), 15)}; do not speculate about unshown rows failing the filters.",
         "",
         "Top matched stocks (symbol | price | sector | fwd PE | rev growth | profit margin | distance to 52W low):",
     ]
@@ -138,6 +149,8 @@ def run_agent_filter(query: str) -> tuple[dict, list[dict]]:
         near_52w_low_pct=filters.get("near_52w_low_pct"),
         min_earnings_growth=filters.get("min_earnings_growth"),
         min_market_cap=filters.get("min_market_cap"),
+        max_price=filters.get("max_price"),
+        min_price=filters.get("min_price"),
         limit=min(int(filters.get("limit", 50)), 250),
         order_by=filters.get("order_by", "market_cap DESC"),
     )

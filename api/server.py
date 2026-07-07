@@ -820,6 +820,8 @@ class UniverseQueryRequest(BaseModel):
     min_earnings_growth: float | None = None
     near_52w_low_pct: float | None = None
     min_market_cap: float | None = None
+    max_price: float | None = None
+    min_price: float | None = None
     limit: int = 50
     order_by: str = "market_cap DESC"
 
@@ -837,6 +839,8 @@ def universe_query(req: UniverseQueryRequest):
         near_52w_low_pct=req.near_52w_low_pct,
         min_earnings_growth=req.min_earnings_growth,
         min_market_cap=req.min_market_cap,
+        max_price=req.max_price,
+        min_price=req.min_price,
         limit=min(req.limit, 500),
         order_by=req.order_by,
     )
