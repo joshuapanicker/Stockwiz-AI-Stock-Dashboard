@@ -154,15 +154,6 @@ function HoldingRow({
             <p className="text-muted text-[10px]">unrealized P&L</p>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {onSell && (
-              <button
-                onClick={e => { e.stopPropagation(); setSellPrice(h.current_price?.toFixed(2) ?? ""); setShowSellModal(true); }}
-                className="flex items-center gap-1 text-xs text-amber-400/80 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 border border-amber-400/20 px-2 py-1 rounded-lg transition-colors"
-                title="Record sale"
-              >
-                <DollarSign size={11} />Sell
-              </button>
-            )}
             <button onClick={e => { e.stopPropagation(); onRemove(h.symbol); }}
               disabled={deleting}
               className="text-muted hover:text-red transition-colors p-1.5 rounded-lg hover:bg-red/10"
@@ -172,6 +163,18 @@ function HoldingRow({
             {expanded ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
           </div>
         </div>
+
+        {/* Sell button — outside the expand click area so it always fires */}
+        {onSell && (
+          <button
+            onClick={e => { e.stopPropagation(); setSellPrice(h.current_price?.toFixed(2) ?? ""); setShowSellModal(true); }}
+            className="flex items-center gap-1.5 text-xs text-amber-400/80 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-xl transition-colors mr-3 mb-1 ml-auto"
+            title="Record sale"
+          >
+            <DollarSign size={12} />
+            Record Sale
+          </button>
+        )}
       </div>
 
       {expanded && (
