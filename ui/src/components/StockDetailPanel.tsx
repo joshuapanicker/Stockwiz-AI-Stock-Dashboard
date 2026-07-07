@@ -8,6 +8,7 @@ import StockChat from "./StockChat";
 import NewsPanel from "./NewsPanel";
 import FinancialsTab from "./FinancialsTab";
 import TechnicalsTab from "./TechnicalsTab";
+import TickerLogo from "./TickerLogo";
 import SymbolSearch from "./SymbolSearch";
 import { usePriceHistory, useAnalysis } from "../hooks/useApi";
 import type { ScreenedStock } from "../types";
@@ -52,16 +53,21 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border flex-shrink-0 anim-fade-down">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-white font-bold text-lg font-mono">{stock.symbol}</span>
-            <span className={clsx(
-              "text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide",
-              stock.classification === "buy" ? "bg-green/15 text-green" : "bg-purple/20 text-purple-300"
-            )}>
-              {stock.classification}
-            </span>
+          <div className="flex items-center gap-3">
+            <TickerLogo symbol={stock.symbol} size={36} />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-white font-bold text-lg font-mono">{stock.symbol}</span>
+                <span className={clsx(
+                  "text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide",
+                  stock.classification === "buy" ? "bg-green/15 text-green" : "bg-purple/20 text-purple-300"
+                )}>
+                  {stock.classification}
+                </span>
+              </div>
+              {m.sector && <p className="text-muted text-xs mt-0.5">{m.sector} · {m.industry}</p>}
+            </div>
           </div>
-          {m.sector && <p className="text-muted text-xs mt-0.5">{m.sector} · {m.industry}</p>}
         </div>
         <button onClick={onClose} className="text-muted hover:text-white transition-colors p-1">
           <X size={16} />
