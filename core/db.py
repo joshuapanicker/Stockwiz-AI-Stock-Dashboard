@@ -106,13 +106,19 @@ DEFAULT_PROFILE = {
 
 def get_user_profile(user_id: str) -> dict:
     """Return user's investment profile, or defaults if not set."""
-    res = (get_client().table("user_profiles")
-           .select("*")
-           .eq("user_id", user_id)
-           .maybe_single()
-           .execute())
-    if res.data:
-        profile = {**DEFAULT_PROFILE, **res.data}
+    try:
+        res = (get_client().table("user_profiles")
+               .select("*")
+               .eq("user_id", user_id)
+               .maybe_single()
+               .execute())
+        data = getattr(res, "data", None)
+    except (AttributeError, TypeError):
+        # Some PostgREST client versions return None for maybe_single() when
+        # the user has not created a profile yet. That is a valid empty state.
+        data = None
+    if data:
+        profile = {**DEFAULT_PROFILE, **data}
         profile.pop("user_id", None)
         profile.pop("updated_at", None)
         return profile
