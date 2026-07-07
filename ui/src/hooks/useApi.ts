@@ -16,6 +16,11 @@ export function setAuthToken(token: string | null) {
   _cachedToken = token;
 }
 
+/** Auth headers for raw fetch calls (SSE streams) that bypass apiFetch. */
+export function getAuthHeaders(): Record<string, string> {
+  return _cachedToken ? { Authorization: `Bearer ${_cachedToken}` } : {};
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (_cachedToken) headers["Authorization"] = `Bearer ${_cachedToken}`;

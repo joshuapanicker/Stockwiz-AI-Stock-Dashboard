@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, User, Plus, MessageSquare, Trash2, ChevronRight } from "lucide-react";
 import clsx from "clsx";
-import { apiFetch, API_BASE } from "../hooks/useApi";
+import { apiFetch, API_BASE, getAuthHeaders } from "../hooks/useApi";
 import TypewriterMessage from "./TypewriterMessage";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -43,7 +43,7 @@ function useChatHistory() {
 async function streamChat(url: string, messages: Message[], onToken: (t: string) => void, signal: AbortSignal) {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
     signal,
   });

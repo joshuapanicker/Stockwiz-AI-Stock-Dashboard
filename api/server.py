@@ -30,6 +30,16 @@ from core.analysis import analyze_stock
 from core.chat import chat as stock_chat
 from core.auth import get_current_user, get_optional_user
 
+# Local-dev escape hatch: the pre-auth file-based portfolio store is only
+# reachable when this env var is set. In production every portfolio
+# operation requires a valid Supabase token.
+ALLOW_ANON_PORTFOLIO = os.getenv("ALLOW_ANON_PORTFOLIO") == "1"
+
+
+def _require_user_or_dev(user_id: str | None) -> None:
+    if user_id is None and not ALLOW_ANON_PORTFOLIO:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
 import math
 from fastapi.responses import JSONResponse
 
@@ -183,7 +193,7 @@ def stock_metrics(symbol: str):
 # yfinance/LLM work here no longer blocks the event loop (and every other
 # in-flight request) the way an `async def` with blocking calls did.
 @app.get("/api/analyze/{symbol}")
-def analyze(symbol: str, action: str = "buy"):
+def analyze(symbol: str, action: str = "buy", user_id: str = Depends(get_current_user)):
     try:
         return analyze_stock(symbol, action)
     except Exception as e:
@@ -193,7 +203,7 @@ def analyze(symbol: str, action: str = "buy"):
 # ── Prediction ────────────────────────────────────────────────────────────
 
 @app.get("/api/predict/{symbol}")
-def predict(symbol: str):
+def predict(symbol: str, user_id: str = Depends(get_current_user)):
     try:
         from core.prediction import predict_stock
         return predict_stock(symbol)
@@ -226,7 +236,7 @@ def _stream_anthropic(system: str, messages: list[dict], max_tokens: int = 400):
 
 
 @app.post("/api/chat/general")
-async def general_chat_endpoint(req: ChatRequest):
+async def general_chat_endpoint(req: ChatRequest, user_id: str = Depends(get_current_user)):
     import asyncio
     from core.general_chat import build_system
     messages = [{"role": m.role, "content": m.content} for m in req.messages]
@@ -240,7 +250,7 @@ async def general_chat_endpoint(req: ChatRequest):
 
 
 @app.post("/api/chat/title")
-async def generate_title(req: ChatRequest):
+async def generate_title(req: ChatRequest, user_id: str = Depends(get_current_user)):
     try:
         import anthropic
         api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -275,10 +285,11 @@ async def chat_endpoint(symbol: str, req: ChatRequest,
 
 @app.get("/api/portfolio")
 def portfolio(user_id: str | None = Depends(get_optional_user)):
+    # Supabase when authenticated; the file store only exists for local dev
+    _require_user_or_dev(user_id)
     from concurrent.futures import ThreadPoolExecutor
     from core.db import get_holdings as db_get_holdings
     from core.portfolio import get_holdings as file_get_holdings
-    # Use Supabase if authenticated, fallback to file for unauthenticated
     if user_id:
         holdings = db_get_holdings(user_id)
     else:
@@ -322,6 +333,7 @@ class AddHoldingRequest(BaseModel):
 
 @app.post("/api/portfolio")
 def add_to_portfolio(req: AddHoldingRequest, user_id: str | None = Depends(get_optional_user)):
+    _require_user_or_dev(user_id)
     from core.db import upsert_holding
     from core.portfolio import add_holding as file_add_holding
     buy_price = req.buy_price
@@ -329,12 +341,13 @@ def add_to_portfolio(req: AddHoldingRequest, user_id: str | None = Depends(get_o
         buy_price = _lookup_price_on_date(req.symbol, req.buy_date)
     if user_id:
         return upsert_holding(user_id, req.symbol, req.buy_date, buy_price, req.notes, req.shares)
-    # Fallback: write to local file (dev only — no auth)
+    # Local dev only (ALLOW_ANON_PORTFOLIO=1): file-backed store
     return file_add_holding(req.symbol, req.buy_date, buy_price, req.notes, req.shares)
 
 
 @app.delete("/api/portfolio/{symbol:path}")
 def remove_from_portfolio(symbol: str, user_id: str | None = Depends(get_optional_user)):
+    _require_user_or_dev(user_id)
     from core.db import delete_holding as db_delete
     from core.portfolio import remove_holding as file_remove
     # URL-decode in case the symbol contains encoded special chars
@@ -372,6 +385,7 @@ def sell_holding(
     user_id: str | None = Depends(get_optional_user),
 ):
     """Record a sale, capture realized P&L, and remove the holding."""
+    _require_user_or_dev(user_id)
     from urllib.parse import unquote
     from datetime import date
     from core.db import record_sale, get_holdings as db_get_holdings
@@ -853,7 +867,7 @@ class AgentFilterRequest(BaseModel):
 
 
 @app.post("/api/universe/agent")
-async def universe_agent(req: AgentFilterRequest):
+async def universe_agent(req: AgentFilterRequest, user_id: str = Depends(get_current_user)):
     """
     Natural language → structured filter → ranked results + streamed AI summary.
     Returns SSE stream. First event contains the structured filter + raw results,
