@@ -358,6 +358,12 @@ def sell_holding(
         holdings = db_get_holdings(user_id)
         holding = next((h for h in holdings if h["symbol"] == symbol), None)
         if not holding:
+            # Already sold — check if a recent sale exists and return it
+            from core.db import get_sold_positions as db_get_sold
+            sold = db_get_sold(user_id)
+            recent = next((s for s in sold if s["symbol"] == symbol), None)
+            if recent:
+                return recent  # idempotent: return the existing sale record
             raise HTTPException(status_code=404, detail=f"{symbol} not found in portfolio")
         return record_sale(
             user_id=user_id,

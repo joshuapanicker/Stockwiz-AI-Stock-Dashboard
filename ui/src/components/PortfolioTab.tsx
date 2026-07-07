@@ -164,17 +164,18 @@ function HoldingRow({
           </div>
         </div>
 
-        {/* Sell button — outside the expand click area so it always fires */}
-        {onSell && (
-          <button
-            onClick={e => { e.stopPropagation(); setSellPrice(h.current_price?.toFixed(2) ?? ""); setShowSellModal(true); }}
-            className="flex items-center gap-1.5 text-xs text-amber-400/80 hover:text-amber-400 bg-amber-400/5 hover:bg-amber-400/10 border border-amber-400/20 px-3 py-1.5 rounded-xl transition-colors mr-3 mb-1 ml-auto"
-            title="Record sale"
-          >
-            <DollarSign size={12} />
-            Record Sale
-          </button>
-        )}
+        {/* Sell button — prominently outside the expand area, always visible */}
+        <div className="flex items-center gap-2 px-4 pb-3">
+          {onSell && (
+            <button
+              onClick={e => { e.stopPropagation(); setSellPrice(h.current_price?.toFixed(2) ?? ""); setShowSellModal(true); }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              <DollarSign size={12} />
+              Record Sale
+            </button>
+          )}
+        </div>
       </div>
 
       {expanded && (
