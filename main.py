@@ -5,8 +5,6 @@ Runs the screener and prints results to stdout (UI layer to be added).
 
 from __future__ import annotations
 
-import asyncio
-
 from core.criteria import get_watchlist
 from core.screener import run_screen
 from core.portfolio import get_holdings, compute_gain
@@ -34,9 +32,9 @@ def print_screen_results() -> None:
         print(f"  {s.symbol:8s}  ${price:<10}  rules met: {rules}")
 
 
-async def print_analysis(symbol: str, action: str) -> None:
+def print_analysis(symbol: str, action: str) -> None:
     print(f"\nAnalyzing {symbol} for {action.upper()}...\n")
-    result = await analyze_stock(symbol, action)
+    result = analyze_stock(symbol, action)
     print(result["analysis_text"])
 
 
@@ -68,7 +66,7 @@ if __name__ == "__main__":
     elif sys.argv[1] == "portfolio":
         print_portfolio()
     elif sys.argv[1] == "analyze" and len(sys.argv) == 4:
-        asyncio.run(print_analysis(sys.argv[2], sys.argv[3]))
+        print_analysis(sys.argv[2], sys.argv[3])
     else:
         print("Usage:")
         print("  python main.py                        # run screener")

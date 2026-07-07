@@ -52,17 +52,27 @@ Reasoning:
 Rules: use only provided data, say "missing" if absent, max 3 bullets."""
 
 
-async def analyze_stock(symbol: str, action: str, gain_pct: float | None = None) -> dict:
+def analyze_stock(symbol: str, action: str, gain_pct: float | None = None) -> dict:
+    from concurrent.futures import ThreadPoolExecutor
     from core.cache import get as cache_get, set as cache_set
     cache_key = f"analysis:{symbol}:{action}:{gain_pct}"
     cached = cache_get(cache_key, 300)  # cache for 5 min
     if cached:
         return cached
 
-    metrics = get_stock_metrics(symbol)
-    market = get_market_context()
+    # Metrics, market context, and news are independent network fetches —
+    # run them concurrently instead of paying for each in sequence.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_metrics = pool.submit(get_stock_metrics, symbol)
+        f_market = pool.submit(get_market_context)
+        f_news = pool.submit(build_news_context, symbol)
+        metrics = f_metrics.result()
+        market = f_market.result()
+        try:
+            news_ctx = f_news.result()
+        except Exception:
+            news_ctx = ""
     criteria_result = evaluate_criteria(action, metrics, market, gain_pct=gain_pct)
-    news_ctx = build_news_context(symbol)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if not api_key:

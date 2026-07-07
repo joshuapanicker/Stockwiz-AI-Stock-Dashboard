@@ -192,10 +192,16 @@ def build_news_context(symbol: str) -> str:
     Build a compact news + earnings context string for injection into Claude prompts.
     Returns empty string if no data available (graceful degradation).
     """
+    from concurrent.futures import ThreadPoolExecutor
+
     lines = []
 
-    # Earnings
-    earnings = get_recent_earnings(symbol)
+    # Earnings and headlines are separate yfinance calls — fetch concurrently
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_earnings = pool.submit(get_recent_earnings, symbol)
+        f_news = pool.submit(get_recent_news, symbol)
+        earnings = f_earnings.result()
+        news = f_news.result()
     if earnings:
         e_line = f"Most recent earnings ({earnings.get('quarter', 'latest')}): {earnings['beat_miss']}"
         if earnings.get("eps_actual") is not None:
@@ -205,7 +211,6 @@ def build_news_context(symbol: str) -> str:
         lines.append(e_line)
 
     # News headlines
-    news = get_recent_news(symbol)
     if news:
         lines.append(f"Recent news ({len(news)} headlines):")
         for item in news:
