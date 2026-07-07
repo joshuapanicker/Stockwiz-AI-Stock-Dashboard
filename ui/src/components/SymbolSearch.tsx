@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import clsx from "clsx";
 import { Search, X } from "lucide-react";
 import { apiFetch } from "../hooks/useApi";
+import TickerLogo from "./TickerLogo";
 
 interface SearchResult {
   symbol: string;
@@ -135,7 +136,8 @@ export default function SymbolSearch({
                 "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors",
                 i === activeIdx ? "bg-green/10" : "hover:bg-white/5"
               )}>
-              <span className="font-mono font-semibold text-white text-sm w-16 flex-shrink-0">{r.symbol}</span>
+              <TickerLogo symbol={r.symbol} size={28} />
+              <span className="font-mono font-semibold text-white text-sm flex-shrink-0">{r.symbol}</span>
               <span className="text-muted text-xs truncate flex-1">{r.sector ?? ""}</span>
               <div className="flex items-center gap-2 flex-shrink-0 text-right">
                 {r.close_price && (
