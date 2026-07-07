@@ -54,17 +54,17 @@ export default function MACDChart({ history, height = 150 }: Props) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-        <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false} width={36} tickFormatter={v => v.toFixed(1)} />
+        <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+        <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false} width={36} tickFormatter={v => v.toFixed(1)} />
         <Tooltip content={<CustomTooltip />} />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.1)" />
         <Bar dataKey="Hist" name="Histogram" maxBarSize={4}>
           {data.map((d, i) => (
-            <Cell key={i} fill={(d.Hist ?? 0) >= 0 ? "rgba(0,230,118,0.6)" : "rgba(255,23,68,0.6)"} />
+            <Cell key={i} fill={(d.Hist ?? 0) >= 0 ? "rgba(46,230,168,0.6)" : "rgba(255,92,122,0.6)"} />
           ))}
         </Bar>
-        <Line type="monotone" dataKey="MACD"   stroke="#00e676" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
-        <Line type="monotone" dataKey="Signal" stroke="#ff6d00" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls />
+        <Line type="monotone" dataKey="MACD"   stroke="#2EE6A8" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
+        <Line type="monotone" dataKey="Signal" stroke="#FFAC26" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} connectNulls />
       </ComposedChart>
     </ResponsiveContainer>
   );

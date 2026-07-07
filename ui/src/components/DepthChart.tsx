@@ -38,23 +38,23 @@ export default function DepthChart({ data, height = 160 }: Props) {
       <AreaChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
         <defs>
           <linearGradient id="bidGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#00e676" stopOpacity={0.4} />
-            <stop offset="95%" stopColor="#00e676" stopOpacity={0.05} />
+            <stop offset="5%" stopColor="#2EE6A8" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#2EE6A8" stopOpacity={0.05} />
           </linearGradient>
           <linearGradient id="askGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#ff1744" stopOpacity={0.4} />
-            <stop offset="95%" stopColor="#ff1744" stopOpacity={0.05} />
+            <stop offset="5%" stopColor="#FF5C7A" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#FF5C7A" stopOpacity={0.05} />
           </linearGradient>
         </defs>
         <XAxis
           dataKey="price"
-          tick={{ fill: "#6b7280", fontSize: 10 }}
+          tick={{ fill: "#6E7787", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => `$${Number(v).toFixed(0)}`}
         />
         <YAxis
-          tick={{ fill: "#6b7280", fontSize: 10 }}
+          tick={{ fill: "#6E7787", fontSize: 10 }}
           axisLine={false}
           tickLine={false}
         />
@@ -63,7 +63,7 @@ export default function DepthChart({ data, height = 160 }: Props) {
           type="stepAfter"
           dataKey="bidSize"
           name="Bid"
-          stroke="#00e676"
+          stroke="#2EE6A8"
           strokeWidth={1.5}
           fill="url(#bidGrad)"
           dot={false}
@@ -72,7 +72,7 @@ export default function DepthChart({ data, height = 160 }: Props) {
           type="stepBefore"
           dataKey="askSize"
           name="Ask"
-          stroke="#ff1744"
+          stroke="#FF5C7A"
           strokeWidth={1.5}
           fill="url(#askGrad)"
           dot={false}

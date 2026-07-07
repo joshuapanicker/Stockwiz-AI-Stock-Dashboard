@@ -49,15 +49,15 @@ export default function RelativeStrengthChart({ history, symbol, height = 190 }:
     <div className="flex items-center justify-center text-muted text-xs" style={{ height }}>Loading...</div>
   );
 
-  const stockColor = "#00e676";
-  const spyColor   = "#6b7280";
+  const stockColor = "#2EE6A8";
+  const spyColor   = "#6E7787";
 
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-        <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           interval="preserveStartEnd" />
-        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           tickFormatter={v => `${v >= 0 ? "+" : ""}${v.toFixed(0)}%`} domain={["auto", "auto"]} width={38} />
         <Tooltip content={<CustomTooltip />} />
         <Legend wrapperStyle={{ fontSize: 9, paddingTop: 4 }}

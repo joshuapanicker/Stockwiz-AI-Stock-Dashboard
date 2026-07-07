@@ -11,6 +11,7 @@ import SymbolSearch from "./SymbolSearch";
 import PlaidConnect from "./PlaidConnect";
 import TickerLogo from "./TickerLogo";
 import { useAnalysis, useUniverseSignals, useSoldPositions } from "../hooks/useApi";
+import { usePersistedNumber, makeDragger } from "../hooks/usePersistedNumber";
 import type { HoldingWithMetrics } from "../types";
 
 interface Props {
@@ -23,20 +24,39 @@ interface Props {
   onPortfolioRefresh?: () => void;
 }
 
-// Combined portfolio value chart — merges all holdings' history by date
+// Combined portfolio value chart — merges all holdings' history by date.
+// Shares-weighted, starts where every holding has data (so the curve never
+// fake-dips when one position has a shorter history), and carries each
+// holding's last known price forward across missing dates.
 function buildCombinedHistory(holdings: HoldingWithMetrics[]) {
-  const map: Record<string, number> = {};
-  for (const h of holdings) {
-    if (!h.history?.length) continue;
-    for (const pt of h.history) {
-      map[pt.date] = (map[pt.date] ?? 0) + pt.close;
-    }
-  }
-  return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, value]) => ({ date, value: parseFloat(value.toFixed(2)) }));
+  const withHistory = holdings.filter(h => h.history?.length);
+  if (!withHistory.length) return [];
+
+  const startDate = withHistory
+    .map(h => h.history[0]?.date ?? "")
+    .reduce((a, b) => (a > b ? a : b), "");
+  const allDates = [...new Set(withHistory.flatMap(h => h.history.map(pt => pt.date)))]
+    .filter(d => d >= startDate)
+    .sort();
+
+  const priceMaps = withHistory.map(h => ({
+    shares: h.shares ?? 1,
+    prices: Object.fromEntries(h.history.map(pt => [pt.date, pt.close])) as Record<string, number>,
+  }));
+
+  const lastPrice: Record<number, number> = {};
+  return allDates.map(date => {
+    let value = 0;
+    priceMaps.forEach((entry, idx) => {
+      if (entry.prices[date] != null) lastPrice[idx] = entry.prices[date];
+      value += (lastPrice[idx] ?? 0) * entry.shares;
+    });
+    return { date, value: parseFloat(value.toFixed(2)) };
+  });
 }
 
-const DONUT_COLORS = ["#00e676", "#7c3aed", "#ff6d00", "#00bcd4", "#ff1744", "#ffd600"];
+// Pulse chart palette
+const DONUT_COLORS = ["#2EE6A8", "#8055F5", "#FFAC26", "#3FA7FC", "#FF5C7A", "#F6D125", "#FF7F50", "#34D399"];
 
 function DonutTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -319,6 +339,10 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deletingSymbols, setDeletingSymbols] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // User-resizable right panel (screener signals) — persisted across sessions
+  const [rightWidth, setRightWidth] = usePersistedNumber("pulse_portfolio_right_w", 420);
+  const onDividerDrag = makeDragger(setRightWidth, () => rightWidth, "x",
+    (d, s) => Math.min(640, Math.max(280, s - d)));
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
   const avgGain = holdings.length
     ? holdings.reduce((s, h) => s + (h.gain_pct ?? 0), 0) / holdings.length : 0;
@@ -345,14 +369,24 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
     );
   }, [holdings, positionSearch]);
 
-  // Allocation data for donut
+  // Allocation data for donut — by actual position value (price × shares)
   const allocationData = useMemo(() => {
-    const total = holdings.reduce((s, h) => s + (h.current_price ?? 0), 0);
+    const positionValue = (h: HoldingWithMetrics) =>
+      h.total_value ?? ((h.current_price ?? 0) * (h.shares ?? 1));
+    const total = holdings.reduce((s, h) => s + positionValue(h), 0);
     if (!total) return [];
-    return holdings.map(h => ({
-      name: h.symbol,
-      value: parseFloat((((h.current_price ?? 0) / total) * 100).toFixed(1)),
-    }));
+    const slices = holdings
+      .map(h => ({ name: h.symbol, value: parseFloat(((positionValue(h) / total) * 100).toFixed(1)) }))
+      .sort((a, b) => b.value - a.value);
+    // Bucket everything beyond the top 7 into "Other" so the legend stays readable
+    if (slices.length > 8) {
+      const rest = slices.slice(7);
+      return [...slices.slice(0, 7), {
+        name: "OTHER",
+        value: parseFloat(rest.reduce((s, x) => s + x.value, 0).toFixed(1)),
+      }];
+    }
+    return slices;
   }, [holdings]);
 
   function handleAdd() {
@@ -418,9 +452,13 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
 
   return (
     <div className="h-full flex flex-col bg-bg relative overflow-hidden">
-      {/* Portfolio gradient — full screen diagonal purple wash */}
+      {/* Portfolio ambience — teal when up, rose when down, violet depth */}
       <div className="fixed inset-0 pointer-events-none z-0 gradient-reveal"
-        style={{ background: "radial-gradient(ellipse 120% 80% at 0% 0%, rgba(124,58,237,0.12) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 100% 100%, rgba(109,40,217,0.10) 0%, transparent 60%)" }}
+        style={{
+          background: gainUp
+            ? "radial-gradient(ellipse 120% 80% at 0% 0%, rgba(46,230,168,0.10) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 100% 100%, rgba(128,85,245,0.08) 0%, transparent 60%)"
+            : "radial-gradient(ellipse 120% 80% at 0% 0%, rgba(255,92,122,0.09) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 100% 100%, rgba(128,85,245,0.08) 0%, transparent 60%)",
+        }}
       />
 
       {/* ── Hero section ── */}
@@ -549,7 +587,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
             <>
             {/* Charts row */}
             <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
-              <div className="col-span-2 bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col">
+              <div className="chart-card col-span-2 glass-card bg-card2/70 rounded-2xl border border-border/40 p-5 flex flex-col">
                 <div className="mb-4 flex-shrink-0">
                   <p className="text-white font-semibold text-sm">Portfolio Performance</p>
                   <p className="text-muted text-xs mt-0.5">Combined value over time</p>
@@ -560,18 +598,18 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                     <AreaChart data={combinedHistory} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="combGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.02} />
+                          <stop offset="5%" stopColor="#2EE6A8" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#8055F5" stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
-                      <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
+                      <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 10 }} axisLine={false} tickLine={false}
                         tickFormatter={v => v.slice(5)} interval="preserveStartEnd" />
-                      <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} axisLine={false} tickLine={false}
+                      <YAxis tick={{ fill: "#6E7787", fontSize: 10 }} axisLine={false} tickLine={false}
                         tickFormatter={v => `$${v.toFixed(0)}`} domain={["auto", "auto"]} />
                       <Tooltip content={<CombinedChartTooltip />} />
-                      <Area type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2}
+                      <Area type="monotone" dataKey="value" stroke="#2EE6A8" strokeWidth={2}
                         fill="url(#combGrad)" dot={false}
-                        activeDot={{ r: 4, fill: "#7c3aed", stroke: "#131318", strokeWidth: 2 }} />
+                        activeDot={{ r: 4, fill: "#2EE6A8", stroke: "#10131A", strokeWidth: 2 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
@@ -580,7 +618,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                 </div>{/* end flex-1 */}
               </div>
 
-              <div className="bg-card2 rounded-2xl border border-border/40 p-5 flex flex-col" style={{ minHeight: 0 }}>
+              <div className="chart-card glass-card bg-card2/70 rounded-2xl border border-border/40 p-5 flex flex-col" style={{ minHeight: 0 }}>
                 <p className="text-white font-semibold text-sm mb-1">Allocation</p>
                 <p className="text-muted text-xs mb-3">By current value</p>
                 {allocationData.length > 0 ? (
@@ -791,11 +829,16 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
           )}
         </div>{/* end left column */}
 
-          {/* ── Vertical divider ── */}
-          <div className="w-px bg-border/50 flex-shrink-0 mx-1" />
+          {/* ── Draggable vertical divider ── */}
+          <div onMouseDown={onDividerDrag}
+            title="Drag to resize panel"
+            className="divider-handle w-1.5 flex-shrink-0 cursor-col-resize flex items-center justify-center mx-1">
+            <div className="divider-line w-0.5 h-full bg-border/50 rounded-full transition-colors" />
+          </div>
 
-          {/* ── RIGHT: screener signals ── */}
-          <div className="w-[420px] flex-shrink-0 overflow-y-auto pl-4 space-y-4">
+          {/* ── RIGHT: screener signals — user-resizable ── */}
+          <div style={{ width: rightWidth, minWidth: 280, maxWidth: 640 }}
+            className="flex-shrink-0 overflow-y-auto pl-4 space-y-4">
             <div className="pt-1 pb-1 flex items-center justify-between sticky top-0 bg-bg z-10">
               <div>
                 <p className="text-white font-semibold text-sm">Screener Signals</p>
@@ -822,10 +865,11 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                     </p>
                     <div className="space-y-1.5">
                       {buySignals.map((s: any) => (
-                        <div key={s.symbol} className="bg-green/5 border border-green/20 rounded-xl px-4 py-3 flex items-center justify-between">
-                          <div>
+                        <div key={s.symbol} className="bg-green/5 border border-green/20 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-green/[0.08] transition-colors">
+                          <TickerLogo symbol={s.symbol} size={28} />
+                          <div className="flex-1 min-w-0">
                             <p className="font-mono font-semibold text-white text-sm">{s.symbol}</p>
-                            <p className="text-muted text-[10px]">{s.metrics?.sector ?? "—"}</p>
+                            <p className="text-muted text-[10px] truncate">{s.metrics?.sector ?? "—"}</p>
                           </div>
                           <div className="text-right">
                             <p className="font-mono text-white text-sm">${s.metrics?.close_price?.toFixed(2) ?? "—"}</p>
@@ -846,10 +890,11 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                     </p>
                     <div className="space-y-1.5">
                       {watchSignals.map((s: any) => (
-                        <div key={s.symbol} className="bg-purple/5 border border-purple/20 rounded-xl px-4 py-3 flex items-center justify-between">
-                          <div>
+                        <div key={s.symbol} className="bg-purple/5 border border-purple/20 rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-purple/[0.08] transition-colors">
+                          <TickerLogo symbol={s.symbol} size={28} />
+                          <div className="flex-1 min-w-0">
                             <p className="font-mono font-semibold text-white text-sm">{s.symbol}</p>
-                            <p className="text-muted text-[10px]">{s.metrics?.sector ?? "—"}</p>
+                            <p className="text-muted text-[10px] truncate">{s.metrics?.sector ?? "—"}</p>
                           </div>
                           <div className="text-right">
                             <p className="font-mono text-white text-sm">${s.metrics?.close_price?.toFixed(2) ?? "—"}</p>

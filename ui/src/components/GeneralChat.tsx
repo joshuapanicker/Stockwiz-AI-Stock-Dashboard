@@ -159,7 +159,7 @@ export default function GeneralChat() {
     <div className="flex h-full min-h-0 overflow-hidden relative">
       {/* Market Chat gradient */}
       <div className="fixed inset-0 pointer-events-none z-0 gradient-reveal"
-        style={{ background: "radial-gradient(ellipse 120% 80% at 100% 0%, rgba(0,230,118,0.09) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 0% 100%, rgba(16,185,129,0.08) 0%, transparent 60%)" }}
+        style={{ background: "radial-gradient(ellipse 120% 80% at 100% 0%, rgba(46,230,168,0.09) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 0% 100%, rgba(16,185,129,0.08) 0%, transparent 60%)" }}
       />
 
       {/* Sidebar */}

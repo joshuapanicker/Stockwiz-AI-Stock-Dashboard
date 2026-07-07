@@ -37,7 +37,7 @@ function computeRSI(closes: number[], period = 14): (number | null)[] {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length || payload[0].value == null) return null;
   const v = payload[0].value;
-  const color = v > 70 ? "#ff1744" : v < 30 ? "#00e676" : "#6b7280";
+  const color = v > 70 ? "#FF5C7A" : v < 30 ? "#2EE6A8" : "#6E7787";
   return (
     <div className="bg-card2 border border-border rounded-lg px-3 py-2 text-xs shadow-xl">
       <p className="text-muted mb-1">{label}</p>
@@ -62,21 +62,21 @@ export default function RSIChart({ history, height = 150 }: Props) {
       <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <defs>
           <linearGradient id="rsiGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.4} />
-            <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.05} />
+            <stop offset="5%"  stopColor="#8055F5" stopOpacity={0.4} />
+            <stop offset="95%" stopColor="#8055F5" stopOpacity={0.05} />
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
-        <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <XAxis dataKey="date" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           interval="preserveStartEnd" />
-        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+        <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
           domain={[0, 100]} ticks={[0, 30, 50, 70, 100]} width={28} />
         <Tooltip content={<CustomTooltip />} />
         {/* Overbought / oversold zones */}
-        <ReferenceLine y={70} stroke="rgba(255,23,68,0.5)"  strokeDasharray="3 3" label={{ value: "70", fill: "#ff1744", fontSize: 8, position: "insideRight" }} />
-        <ReferenceLine y={30} stroke="rgba(0,230,118,0.5)"  strokeDasharray="3 3" label={{ value: "30", fill: "#00e676", fontSize: 8, position: "insideRight" }} />
+        <ReferenceLine y={70} stroke="rgba(255,92,122,0.5)"  strokeDasharray="3 3" label={{ value: "70", fill: "#FF5C7A", fontSize: 8, position: "insideRight" }} />
+        <ReferenceLine y={30} stroke="rgba(46,230,168,0.5)"  strokeDasharray="3 3" label={{ value: "30", fill: "#2EE6A8", fontSize: 8, position: "insideRight" }} />
         <ReferenceLine y={50} stroke="rgba(255,255,255,0.08)" />
-        <Area type="monotone" dataKey="rsi" stroke="#7c3aed" strokeWidth={1.5}
+        <Area type="monotone" dataKey="rsi" stroke="#8055F5" strokeWidth={1.5}
           fill="url(#rsiGrad)" dot={false} activeDot={{ r: 3 }} />
       </AreaChart>
     </ResponsiveContainer>

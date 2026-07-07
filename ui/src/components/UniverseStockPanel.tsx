@@ -113,7 +113,7 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
         ) : history.length > 0 ? (
           chartMode === "candle"
             ? <CandlestickChart data={history} height={220} />
-            : <AreaChart data={areaData} height={220} color="#00e676" />
+            : <AreaChart data={areaData} height={220} color="#2EE6A8" />
         ) : (
           <div className="flex items-center justify-center h-[220px] text-muted text-xs">No chart data</div>
         )}

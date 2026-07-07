@@ -93,13 +93,13 @@ export default function FinancialsTab({ symbol }: Props) {
           <p className="text-xs text-muted mb-2">Quarterly Revenue</p>
           <ResponsiveContainer width="100%" height={120}>
             <BarChart data={revData} margin={{ top: 0, right: 0, left: -15, bottom: 0 }}>
-              <XAxis dataKey="quarter" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+              <XAxis dataKey="quarter" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
                 tickFormatter={v => `$${fmtLarge(v)}`} width={38} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
               <Bar dataKey="revenue" name="Revenue" radius={[3, 3, 0, 0]} maxBarSize={24}>
                 {revData.map((_, i) => (
-                  <Cell key={i} fill={i === revData.length - 1 ? "rgba(0,230,118,0.7)" : "rgba(0,230,118,0.35)"} />
+                  <Cell key={i} fill={i === revData.length - 1 ? "rgba(46,230,168,0.7)" : "rgba(46,230,168,0.35)"} />
                 ))}
               </Bar>
             </BarChart>
@@ -113,15 +113,15 @@ export default function FinancialsTab({ symbol }: Props) {
           <p className="text-xs text-muted mb-2">Quarterly Net Income</p>
           <ResponsiveContainer width="100%" height={100}>
             <BarChart data={niData} margin={{ top: 0, right: 0, left: -15, bottom: 0 }}>
-              <XAxis dataKey="quarter" tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} axisLine={false} tickLine={false}
+              <XAxis dataKey="quarter" tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#6E7787", fontSize: 9 }} axisLine={false} tickLine={false}
                 tickFormatter={v => `$${fmtLarge(v)}`} width={38} />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
               <Bar dataKey="net_income" name="Net Income" radius={[3, 3, 0, 0]} maxBarSize={24}>
                 {niData.map((entry, i) => (
                   <Cell key={i} fill={(entry.net_income ?? 0) >= 0
-                    ? (i === niData.length - 1 ? "rgba(0,230,118,0.7)" : "rgba(0,230,118,0.35)")
-                    : "rgba(255,23,68,0.5)"} />
+                    ? (i === niData.length - 1 ? "rgba(46,230,168,0.7)" : "rgba(46,230,168,0.35)")
+                    : "rgba(255,92,122,0.5)"} />
                 ))}
               </Bar>
             </BarChart>

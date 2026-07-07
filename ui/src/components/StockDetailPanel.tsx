@@ -116,7 +116,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
         ) : chartMode === "candle" ? (
           <CandlestickChart data={history} height={220} />
         ) : (
-          <AreaChart data={areaData} height={220} color="#00e676" />
+          <AreaChart data={areaData} height={220} color="#2EE6A8" />
         )}
       </div>
 
