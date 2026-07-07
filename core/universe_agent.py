@@ -35,7 +35,7 @@ Return ONLY a valid JSON object with these optional fields (omit fields the user
   "min_earnings_growth": 0.05,      // minimum earnings growth (decimal)
   "near_52w_low_pct": 0.20,         // within X% of 52-week low (e.g. 0.20 = 20%)
   "min_market_cap": 1000000000,     // minimum market cap in dollars
-  "limit": 20,                      // max results (default 20, max 50)
+  "limit": 50,                      // max results (default 50, max 250 — use higher limits when the user wants a broad pool)
   "order_by": "market_cap DESC",    // one of: market_cap DESC/ASC, revenue_growth DESC/ASC,
                                     //   forward_pe ASC/DESC, distance_to_low_pct ASC/DESC,
                                     //   profit_margin DESC/ASC, earnings_growth DESC/ASC
@@ -138,7 +138,7 @@ def run_agent_filter(query: str) -> tuple[dict, list[dict]]:
         near_52w_low_pct=filters.get("near_52w_low_pct"),
         min_earnings_growth=filters.get("min_earnings_growth"),
         min_market_cap=filters.get("min_market_cap"),
-        limit=min(int(filters.get("limit", 20)), 50),
+        limit=min(int(filters.get("limit", 50)), 250),
         order_by=filters.get("order_by", "market_cap DESC"),
     )
 

@@ -788,7 +788,9 @@ def universe_status():
     """Return background fetch progress and cache stats."""
     from core.universe_fetcher import get_progress
     from core.universe_cache import get_cached_count, get_total_universe_size
+    from core.universe_symbols import _read_universe_file
     progress = get_progress()
+    universe = _read_universe_file()
     return {
         "cached": get_cached_count(),
         "total": get_total_universe_size(),
@@ -796,6 +798,9 @@ def universe_status():
         "fetched_this_cycle": progress["fetched"],
         "cycle_total": progress["total"],
         "last_run": progress["last_run"],
+        # Where the symbol universe comes from — surfaced in the UI
+        "universe_source": "NASDAQ · NYSE · AMEX listings" if universe.get("source") == "nasdaqtrader" else "curated list",
+        "universe_updated": universe.get("updated"),
     }
 
 
@@ -832,7 +837,7 @@ def universe_query(req: UniverseQueryRequest):
         near_52w_low_pct=req.near_52w_low_pct,
         min_earnings_growth=req.min_earnings_growth,
         min_market_cap=req.min_market_cap,
-        limit=min(req.limit, 100),
+        limit=min(req.limit, 500),
         order_by=req.order_by,
     )
     return results

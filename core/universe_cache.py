@@ -58,8 +58,12 @@ COLUMNS = [
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row
+    # WAL lets API reads proceed while the background fetcher writes —
+    # essential now that the universe is ~6k symbols and writes are constant.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 
@@ -87,11 +91,21 @@ def ensure_schema() -> None:
                 fetch_error          TEXT
             )
         """)
+        # Indexes for the screener's common filters/sorts at ~6k-row scale
+        for idx in [
+            "CREATE INDEX IF NOT EXISTS idx_universe_mcap ON universe_stocks(market_cap DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_universe_sector ON universe_stocks(sector)",
+            "CREATE INDEX IF NOT EXISTS idx_universe_fpe ON universe_stocks(forward_pe)",
+            "CREATE INDEX IF NOT EXISTS idx_universe_revg ON universe_stocks(revenue_growth)",
+            "CREATE INDEX IF NOT EXISTS idx_universe_dlow ON universe_stocks(distance_to_low_pct)",
+            "CREATE INDEX IF NOT EXISTS idx_universe_updated ON universe_stocks(last_updated)",
+        ]:
+            conn.execute(idx)
         conn.commit()
 
 
 def get_universe_symbols() -> list[str]:
-    """Return all symbols in universe.json."""
+    """Return all symbols in universe.json (priority-ordered)."""
     data = json.loads(UNIVERSE_FILE.read_text())
     return data.get("symbols", [])
 
@@ -129,13 +143,24 @@ def upsert_stock(metrics: dict, error: str | None = None) -> None:
         conn.commit()
 
 
+# Symbols that errored (delisted tickers, dead SPACs) are retried far less
+# often so refresh cycles aren't dominated by re-fetching dead names.
+ERROR_RETRY_TTL = 3 * 86_400
+
+
 def get_stale_symbols(max_age: float = UNIVERSE_RECORD_TTL) -> list[str]:
-    """Return symbols that are missing or older than max_age seconds."""
+    """
+    Return symbols that are missing or older than max_age seconds,
+    in universe priority order (curated large caps first).
+    """
     all_symbols = get_universe_symbols()
-    cutoff = time.time() - max_age
+    now = time.time()
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT symbol FROM universe_stocks WHERE last_updated > ?", (cutoff,)
+            """SELECT symbol FROM universe_stocks
+               WHERE (fetch_error IS NULL AND last_updated > ?)
+                  OR (fetch_error IS NOT NULL AND last_updated > ?)""",
+            (now - max_age, now - ERROR_RETRY_TTL),
         ).fetchall()
     fresh = {r["symbol"] for r in rows}
     return [s for s in all_symbols if s not in fresh]
