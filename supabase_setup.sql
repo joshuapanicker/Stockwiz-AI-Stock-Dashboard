@@ -52,3 +52,27 @@ create policy "users can manage own profile"
 
 -- Add shares column to portfolios (run if table already exists)
 alter table portfolios add column if not exists shares numeric default 1;
+
+-- ── Sold positions / trade history ───────────────────────────────────────
+create table if not exists sold_positions (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  symbol        text not null,
+  sell_date     date not null,
+  sell_price    numeric(12, 4) not null,
+  shares        numeric(12, 4) not null default 1,
+  buy_price     numeric(12, 4),
+  buy_date      date,
+  realized_gain numeric(14, 4),
+  realized_pct  numeric(10, 4),
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists sold_positions_user_id_idx
+  on sold_positions (user_id, sell_date desc);
+
+alter table sold_positions enable row level security;
+create policy "users can manage own sold positions"
+  on sold_positions for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
