@@ -418,7 +418,7 @@ export default function LandingPage() {
                       style={{ background: c }}>{["J","A","M","S"][i]}</div>
                   ))}
                 </div>
-                <p className="text-muted text-xs"><span className="text-white font-semibold">500+</span> investors using StockWiz</p>
+                <p className="text-muted text-xs">Join other Investors on StockWiz</p>
               </div>
             </FadeIn>
           </div>
