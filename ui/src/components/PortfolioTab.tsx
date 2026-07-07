@@ -229,10 +229,17 @@ function HoldingRow({
       )}
     </div>
 
-    {/* Sell modal */}
+    {/* Sell modal — rendered via portal outside the row to avoid overflow:hidden clipping */}
     {showSellModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSellModal(false)}>
-        <div className="bg-card2 border border-border rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4" onClick={e => e.stopPropagation()}>
+      <div
+        style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+        onClick={() => setShowSellModal(false)}
+      >
+        <div
+          style={{ position: 'relative', zIndex: 10000, width: '100%', maxWidth: '24rem', margin: '0 1rem' }}
+          className="bg-card2 border border-border rounded-2xl p-6 space-y-4"
+          onClick={e => e.stopPropagation()}
+        >
           <div>
             <p className="text-white font-semibold text-base">Record Sale — {h.symbol}</p>
             <p className="text-muted text-xs mt-1">{h.shares} shares · bought @ ${h.buy_price?.toFixed(2) ?? "—"}</p>
@@ -264,11 +271,19 @@ function HoldingRow({
             )}
           </div>
           <div className="flex gap-2 pt-1">
-            <button onClick={handleSell} disabled={selling || !sellPrice}
-              className="flex-1 bg-amber-400/15 hover:bg-amber-400/25 disabled:opacity-50 text-amber-400 border border-amber-400/30 rounded-xl py-2.5 text-sm font-medium transition-colors">
+            <button
+              onClick={handleSell}
+              disabled={selling || !sellPrice}
+              style={{ pointerEvents: 'auto' }}
+              className="flex-1 bg-amber-400/15 hover:bg-amber-400/25 disabled:opacity-50 text-amber-400 border border-amber-400/30 rounded-xl py-2.5 text-sm font-medium transition-colors cursor-pointer"
+            >
               {selling ? "Recording…" : "Confirm Sale"}
             </button>
-            <button onClick={() => setShowSellModal(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors">
+            <button
+              onClick={() => setShowSellModal(false)}
+              style={{ pointerEvents: 'auto' }}
+              className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors cursor-pointer"
+            >
               Cancel
             </button>
           </div>
