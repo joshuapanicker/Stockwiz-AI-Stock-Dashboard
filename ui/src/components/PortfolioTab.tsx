@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { Plus, Trash2, TrendingUp, TrendingDown, Package, ChevronDown, ChevronUp, RefreshCw, Search, Building2, DollarSign, History } from "lucide-react";
 import {
@@ -229,15 +230,17 @@ function HoldingRow({
       )}
     </div>
 
-    {/* Sell modal — rendered via portal outside the row to avoid overflow:hidden clipping */}
-    {showSellModal && (
+    {/* Sell modal — rendered via React portal directly on document.body,
+        completely outside any overflow:hidden / stacking context */}
+    {showSellModal && createPortal(
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+        className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        style={{ zIndex: 99999 }}
         onClick={() => setShowSellModal(false)}
       >
         <div
-          style={{ position: 'relative', zIndex: 10000, width: '100%', maxWidth: '24rem', margin: '0 1rem' }}
-          className="bg-card2 border border-border rounded-2xl p-6 space-y-4"
+          className="bg-card2 border border-border rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4"
+          style={{ zIndex: 100000, position: 'relative' }}
           onClick={e => e.stopPropagation()}
         >
           <div>
@@ -247,13 +250,19 @@ function HoldingRow({
           <div className="space-y-3">
             <div>
               <label className="text-xs text-muted">Sell Price per Share</label>
-              <input type="number" step="0.01" value={sellPrice} onChange={e => setSellPrice(e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50" />
+              <input
+                type="number" step="0.01" value={sellPrice}
+                onChange={e => setSellPrice(e.target.value)}
+                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50"
+              />
             </div>
             <div>
               <label className="text-xs text-muted">Sell Date</label>
-              <input type="date" value={sellDate} onChange={e => setSellDate(e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50" />
+              <input
+                type="date" value={sellDate}
+                onChange={e => setSellDate(e.target.value)}
+                className="w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400/50"
+              />
             </div>
             {estimatedProceeds && (
               <div className="grid grid-cols-2 gap-2 pt-1">
@@ -274,21 +283,20 @@ function HoldingRow({
             <button
               onClick={handleSell}
               disabled={selling || !sellPrice}
-              style={{ pointerEvents: 'auto' }}
-              className="flex-1 bg-amber-400/15 hover:bg-amber-400/25 disabled:opacity-50 text-amber-400 border border-amber-400/30 rounded-xl py-2.5 text-sm font-medium transition-colors cursor-pointer"
+              className="flex-1 bg-amber-400/15 hover:bg-amber-400/25 disabled:opacity-50 text-amber-400 border border-amber-400/30 rounded-xl py-2.5 text-sm font-medium transition-colors"
             >
               {selling ? "Recording…" : "Confirm Sale"}
             </button>
             <button
               onClick={() => setShowSellModal(false)}
-              style={{ pointerEvents: 'auto' }}
-              className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors cursor-pointer"
+              className="flex-1 bg-white/5 hover:bg-white/10 text-muted rounded-xl py-2.5 text-sm transition-colors"
             >
               Cancel
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )}
     </>
   );
