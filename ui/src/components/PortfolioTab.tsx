@@ -537,11 +537,11 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
         <div className="flex-1 min-w-0 overflow-y-auto pr-3 space-y-5">
 
           {holdings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
               <div className="w-16 h-16 rounded-2xl bg-white/5 border border-border/50 flex items-center justify-center">
                 <Package size={24} className="text-muted" />
               </div>
-              <p className="text-white font-semibold">No positions yet</p>
+              <p className="text-white font-semibold">No current positions</p>
               <p className="text-muted text-sm">Add stocks you've purchased to start tracking</p>
             </div>
           ) : (
