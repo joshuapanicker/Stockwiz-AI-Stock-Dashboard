@@ -34,12 +34,17 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path(__file__).parent.parent / "data" / "universe.db"
+# On hosted deploys, point UNIVERSE_DB_PATH at a persistent volume
+# (e.g. /data/universe.db) so the cache survives redeploys. The repo's
+# data/ dir stays the default for local dev.
+DB_PATH = Path(os.getenv("UNIVERSE_DB_PATH") or (Path(__file__).parent.parent / "data" / "universe.db"))
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 UNIVERSE_FILE = Path(__file__).parent.parent / "data" / "universe.json"
 
 # How long a cached record is considered fresh (24 hours)
