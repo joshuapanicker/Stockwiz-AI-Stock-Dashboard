@@ -59,8 +59,10 @@ function NavBar({ tab, setTab, settingsOpen, onCloseSettings }: {
 }
 
 // Dashboard chart slots — a fully dynamic list: users can remove any widget
-// and add new ones (each freely switchable to any chart type)
-interface SlotDef { key: string; defaultType: ChartType }
+// and add new ones (each freely switchable to any chart type).
+// `w` is the slot's width share of its row (0.25–0.75), adjustable by
+// dragging the divider between the two cards in a row.
+interface SlotDef { key: string; defaultType: ChartType; w?: number }
 
 const DEFAULT_SLOTS: SlotDef[] = [
   { key: "slot1", defaultType: "candlestick" },
@@ -90,7 +92,6 @@ export default function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>("AAPL");
   const [selectedUniverseMetrics, setSelectedUniverseMetrics] = useState<any | null>(null);
   const [rightWidth, setRightWidth] = usePersistedNumber("pulse_analysis_right_w", 340);
-  const [chartH, setChartH] = usePersistedNumber("pulse_analysis_chart_h", 190);
   const [profileOpen, setProfileOpen] = useState(false);
   const { data: creditsStatus } = useCredits();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -108,17 +109,128 @@ export default function App() {
     return [...prev, { key: `slot_${Date.now()}`, defaultType: "candlestick" as ChartType }];
   });
 
-  // Drag-to-reorder — only the chart widget grid supports this. Dragging is
-  // initiated from a dedicated grip handle (not the whole card) so it never
-  // fights with the chart libraries' own click/drag interactions.
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  // Per-row chart heights — each row is resizable by dragging its bottom edge
+  const [rowHeights, setRowHeights] = useState<number[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("pulse_chart_row_heights") ?? "null");
+      if (Array.isArray(v) && v.every((n: any) => Number.isFinite(n))) return v;
+    } catch {}
+    // Migrate from the old single global chart height
+    const legacy = parseFloat(localStorage.getItem("pulse_analysis_chart_h") ?? "");
+    const first = Number.isFinite(legacy) ? legacy : 190;
+    return [first, Math.max(110, Math.round(first * 0.79)), 150, 150];
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pulse_chart_row_heights", JSON.stringify(rowHeights)); } catch {}
+  }, [rowHeights]);
+  const getRowH = (i: number) => rowHeights[i] ?? 150;
+  const setRowH = (i: number, v: number) => setRowHeights(prev => {
+    const next = [...prev];
+    next[i] = v;
+    return next;
+  });
+
+  const setSlotW = (key: string, w: number) =>
+    setSlots(prev => prev.map(s => (s.key === key ? { ...s, w } : s)));
+
+  // Drag-to-reorder — pointer-based (not native HTML5 drag, which only shows
+  // a translucent ghost while the original stays in place). The real card
+  // follows the cursor via transform; the hovered card highlights as the
+  // drop target. Dragging is initiated from the grip handle only, so it
+  // never fights with the chart libraries' own pointer interactions.
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const reorderSlots = (from: number, to: number) => setSlots(prev => {
     const next = [...prev];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
     return next;
   });
+
+  function startWidgetDrag(e: React.MouseEvent, fromIdx: number) {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const el = cardRefs.current[slots[fromIdx].key];
+    setDragIdx(fromIdx);
+    document.body.style.cursor = "grabbing";
+    let currentDrop: number | null = null;
+
+    function onMove(ev: MouseEvent) {
+      if (el) {
+        // Transform moves the card visually without disturbing layout —
+        // no ghost image, the actual chart travels with the cursor
+        el.style.transform = `translate(${ev.clientX - startX}px, ${ev.clientY - startY}px) scale(1.02)`;
+        el.style.zIndex = "60";
+        el.style.pointerEvents = "none";
+      }
+      let found: number | null = null;
+      slots.forEach((s, i) => {
+        if (i === fromIdx) return;
+        const r = cardRefs.current[s.key]?.getBoundingClientRect();
+        if (r && ev.clientX >= r.left && ev.clientX <= r.right &&
+            ev.clientY >= r.top && ev.clientY <= r.bottom) found = i;
+      });
+      if (found !== currentDrop) {
+        currentDrop = found;
+        setDropIdx(found);
+      }
+    }
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      if (el) {
+        el.style.transform = "";
+        el.style.zIndex = "";
+        el.style.pointerEvents = "";
+      }
+      if (currentDrop != null) reorderSlots(fromIdx, currentDrop);
+      setDragIdx(null);
+      setDropIdx(null);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  // Adjust the width split between the two cards of a row
+  function startSplitDrag(e: React.MouseEvent, slotKey: string, startW: number) {
+    e.preventDefault();
+    const rowWidth = (e.currentTarget as HTMLElement).parentElement?.getBoundingClientRect().width || 1;
+    const startX = e.clientX;
+    document.body.style.cursor = "col-resize";
+    function onMove(ev: MouseEvent) {
+      setSlotW(slotKey, Math.min(0.75, Math.max(0.25, startW + (ev.clientX - startX) / rowWidth)));
+    }
+    function onUp() {
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  // Adjust a row's height by dragging its bottom edge
+  function startRowHeightDrag(e: React.MouseEvent, rowIdx: number) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = getRowH(rowIdx);
+    const target = e.currentTarget as HTMLElement;
+    target.classList.add("dragging");
+    document.body.style.cursor = "row-resize";
+    function onMove(ev: MouseEvent) {
+      setRowH(rowIdx, Math.min(420, Math.max(110, startH + (ev.clientY - startY))));
+    }
+    function onUp() {
+      target.classList.remove("dragging");
+      document.body.style.cursor = "";
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
 
   function openSettings(tab: SettingsTab = "criteria") {
     setSettingsTab(tab);
@@ -127,10 +239,10 @@ export default function App() {
 
   const rightColRef = useRef<HTMLDivElement>(null);
 
+  // Full-range divider: the right panel can span from a slim 180px up to
+  // nearly the whole viewport (left side keeps a 320px minimum)
   const onLRDivider = makeDragger(setRightWidth, () => rightWidth, "x",
-    (d, s) => Math.min(600, Math.max(260, s - d)));
-  const onChartHDivider = makeDragger(setChartH, () => chartH, "y",
-    (d, s) => Math.min(320, Math.max(120, s + d / 2)));
+    (d, s) => Math.min(window.innerWidth - 320, Math.max(180, s - d)));
 
   const { data: screened, loading: screenLoading } = useScreener();
   const market = useMarket();
@@ -170,25 +282,24 @@ export default function App() {
     };
   }, [enrichedHoldings]);
 
-  const row2H = Math.max(110, Math.round(chartH * 0.79));
-
-  const renderSlot = (slot: SlotDef, rowIdx: number, flatIdx: number) => {
-    const isDragging = draggedIdx === flatIdx;
-    const isDragOver = dragOverIdx === flatIdx && draggedIdx !== null && draggedIdx !== flatIdx;
+  // widthFrac: the slot's width share of its row (null = fill remaining space)
+  const renderSlot = (slot: SlotDef, rowIdx: number, flatIdx: number, widthFrac: number | null) => {
+    const isDragging = dragIdx === flatIdx;
+    const isDropTarget = dropIdx === flatIdx && dragIdx !== null && dragIdx !== flatIdx;
     return (
       <div key={slot.key}
-        onDragOver={e => { e.preventDefault(); if (draggedIdx !== null) setDragOverIdx(flatIdx); }}
-        onDrop={e => {
-          e.preventDefault();
-          if (draggedIdx !== null && draggedIdx !== flatIdx) reorderSlots(draggedIdx, flatIdx);
-          setDraggedIdx(null);
-          setDragOverIdx(null);
-        }}
+        ref={node => { cardRefs.current[slot.key] = node; }}
         className={clsx(
-          "chart-card glass-card bg-card/60 rounded-2xl p-4 border min-w-0 overflow-hidden anim-fade-up flex-1 transition-colors",
-          isDragging ? "opacity-40 border-border/50" : isDragOver ? "border-green/50 ring-2 ring-green/30" : "border-border/50"
+          "chart-card glass-card bg-card/60 rounded-2xl p-4 border min-w-0 overflow-hidden anim-fade-up transition-colors",
+          isDragging
+            ? "border-green ring-2 ring-green/60 shadow-2xl"
+            : isDropTarget
+              ? "border-green/50 ring-2 ring-green/30"
+              : "border-border/50"
         )}
-        style={{ flexBasis: "calc(50% - 4px)" }}>
+        style={widthFrac != null
+          ? { width: `calc(${(widthFrac * 100).toFixed(2)}% - 10px)`, flexShrink: 0 }
+          : { flex: 1 }}>
         <ChartWidget
           slotKey={slot.key}
           defaultType={slot.defaultType}
@@ -196,25 +307,13 @@ export default function App() {
           history6m={featuredHistory6m}
           symbol={activeSymbol}
           currentPrice={selectedStock?.metrics?.close_price ?? null}
-          height={rowIdx === 0 ? chartH : row2H}
+          height={getRowH(rowIdx)}
           label={rowIdx === 0 ? (activeSymbol ?? "—") : undefined}
           loadingSkeleton={screenLoading && !featuredHistory.length}
           onRemove={() => removeSlot(slot.key)}
           extra={
             <button
-              draggable
-              onDragStart={e => {
-                setDraggedIdx(flatIdx);
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", String(flatIdx));
-                // Drag the whole card, not just this small handle
-                const card = (e.currentTarget as HTMLElement).closest(".chart-card") as HTMLElement | null;
-                if (card) {
-                  const rect = card.getBoundingClientRect();
-                  e.dataTransfer.setDragImage(card, e.clientX - rect.left, e.clientY - rect.top);
-                }
-              }}
-              onDragEnd={() => { setDraggedIdx(null); setDragOverIdx(null); }}
+              onMouseDown={e => startWidgetDrag(e, flatIdx)}
               title="Drag to reorder"
               className="cursor-grab active:cursor-grabbing text-muted hover:text-white p-0.5 rounded transition-colors flex-shrink-0">
               <GripVertical size={12} />
@@ -298,21 +397,32 @@ export default function App() {
 
               {/* Left: charts + table */}
               <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2 pr-1 overflow-hidden">
-                {/* Chart rows — two widgets per row, as many rows as needed */}
-                {slotRows.map((row, rowIdx) => (
-                  <div key={rowIdx} className="flex gap-2 flex-shrink-0 min-w-0 stagger">
-                    {row.map((slot, colIdx) => renderSlot(slot, rowIdx, rowIdx * 2 + colIdx))}
-                  </div>
-                ))}
-
-                {/* Chart-height drag handle */}
-                {slots.length > 0 && (
-                  <div onMouseDown={onChartHDivider}
-                    title="Drag to resize charts"
-                    className="divider-handle h-2 flex-shrink-0 cursor-row-resize flex items-center justify-center">
-                    <div className="divider-line w-10 h-0.5 rounded-full bg-border transition-colors" />
-                  </div>
-                )}
+                {/* Chart rows — two widgets per row; each row's split and
+                    height are adjustable by dragging its side/bottom handles */}
+                {slotRows.map((row, rowIdx) => {
+                  const w = row[0]?.w ?? 0.5;
+                  const twoUp = row.length === 2;
+                  return (
+                    <div key={rowIdx} className="flex flex-col flex-shrink-0 min-w-0">
+                      <div className="flex min-w-0 items-stretch">
+                        {renderSlot(row[0], rowIdx, rowIdx * 2, twoUp ? w : null)}
+                        {twoUp && (
+                          <div onMouseDown={e => startSplitDrag(e, row[0].key, w)}
+                            title="Drag to resize widgets"
+                            className="divider-handle w-1.5 flex-shrink-0 cursor-col-resize flex items-center justify-center mx-1">
+                            <div className="divider-line w-0.5 h-full bg-border rounded-full transition-colors" />
+                          </div>
+                        )}
+                        {twoUp && renderSlot(row[1], rowIdx, rowIdx * 2 + 1, null)}
+                      </div>
+                      <div onMouseDown={e => startRowHeightDrag(e, rowIdx)}
+                        title="Drag to resize row height"
+                        className="divider-handle h-2 flex-shrink-0 cursor-row-resize flex items-center justify-center">
+                        <div className="divider-line w-10 h-0.5 rounded-full bg-border transition-colors" />
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Universe table — scrollable */}
                 <div className="glass-card bg-card/60 rounded-2xl border border-border/50 flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 anim-fade-up" style={{ animationDelay: "150ms" }}>
@@ -334,7 +444,7 @@ export default function App() {
 
               {/* Right: stock detail */}
               <div ref={rightColRef}
-                style={{ width: rightWidth, minWidth: 240, maxWidth: 600 }}
+                style={{ width: rightWidth, minWidth: 180, maxWidth: "calc(100vw - 320px)" }}
                 className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden anim-slide-right">
                 <div className="glass-card bg-card/60 rounded-2xl border border-border/50 overflow-hidden flex-1 min-h-0">
                   {selectedStock ? (
