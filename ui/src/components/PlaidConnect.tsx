@@ -242,6 +242,29 @@ export default function PlaidConnect({ onHoldingsSynced, onHoldingsRemoved }: Pr
       )}
 
       <div className="space-y-4">
+        {/* Sandbox notice — shown prominently BEFORE connecting so users don't
+            try (and fail) to link their real brokerage */}
+        {import.meta.env.VITE_PLAID_ENV !== "production" && (
+          <div className="flex items-start gap-3 bg-amber-400/[0.06] border border-amber-400/25 rounded-2xl px-4 py-3.5">
+            <AlertCircle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed space-y-1.5">
+              <p className="text-amber-400 font-semibold">Test mode — real brokerage accounts will not work</p>
+              <p className="text-white/70">
+                StockWiz runs on Plaid's free Sandbox plan, which never connects to real institutions.
+                Signing in with your actual brokerage credentials will always fail.
+              </p>
+              <p className="text-white/70">
+                To try the sync flow, pick <span className="text-white font-medium">any institution</span> in
+                the Plaid window and use the sample account:{" "}
+                username <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">user_good</span>,
+                password <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">pass_good</span>
+                {" "}(code <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">1234</span> if
+                asked for MFA). Sample holdings will then sync into your portfolio.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Connected accounts */}
         {connections.length > 0 && (
           <div className="space-y-2">
@@ -350,16 +373,6 @@ export default function PlaidConnect({ onHoldingsSynced, onHoldingsRemoved }: Pr
           </div>
         )}
 
-        {/* Sandbox note */}
-        {import.meta.env.VITE_PLAID_ENV === "sandbox" && (
-          <div className="bg-card2 border border-border/40 rounded-xl px-4 py-3">
-            <p className="text-muted text-xs leading-relaxed">
-              <span className="text-white font-medium">Sandbox mode:</span> Use test credentials when prompted.{" "}
-              Username: <span className="font-mono text-white">user_good</span> ·{" "}
-              Password: <span className="font-mono text-white">pass_good</span>
-            </p>
-          </div>
-        )}
       </div>
     </>
   );
