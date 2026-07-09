@@ -33,6 +33,7 @@ function ActiveFilterBar({ filters, query, onClear }: {
 }) {
   if (!filters && !query) return null;
   const pills: string[] = [];
+  if (filters?.symbols?.length) pills.push(filters.symbols.join(", "));
   if (filters?.sector) pills.push(filters.sector);
   if (filters?.max_forward_pe != null) pills.push(`Fwd PE ≤ ${filters.max_forward_pe}`);
   if (filters?.max_trailing_pe != null) pills.push(`Trail PE ≤ ${filters.max_trailing_pe}`);
@@ -346,13 +347,19 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
     setSuggestions([]);
     setSuggestIdx(-1);
     setQuery(s.symbol);
-    // Fetch the full cached row so the detail panel gets complete metrics
+    setConversation([]);
+    // Narrow the results list to just this stock, same as an AI/manual filter
+    setFilters({ symbols: [s.symbol], intent_summary: s.symbol });
+    setResults([s]);
+    // Fetch the full cached row so the detail panel + list row get complete metrics
     try {
       const rows = await apiFetch<UniverseStock[]>("/universe/query", {
         method: "POST",
         body: JSON.stringify({ symbols: [s.symbol], limit: 1 }),
       });
-      onSelect(s.symbol, rows[0] ?? s);
+      const full = rows[0] ?? s;
+      setResults([full]);
+      onSelect(s.symbol, full);
     } catch {
       onSelect(s.symbol, s);
     }

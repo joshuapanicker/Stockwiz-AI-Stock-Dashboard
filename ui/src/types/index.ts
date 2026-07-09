@@ -107,6 +107,7 @@ export interface AnalysisResult {
 // ── Universe types ─────────────────────────────────────────────────────────
 
 export interface UniverseFilters {
+  symbols?: string[] | null;
   sector?: string | null;
   max_forward_pe?: number | null;
   max_trailing_pe?: number | null;
