@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import clsx from "clsx";
 import { X, ShoppingCart } from "lucide-react";
 import CandlestickChart from "./CandlestickChart";
@@ -33,6 +33,17 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
   const [shares, setShares] = useState("1");
   const [rightTab, setRightTab] = useState<RightTab>("analysis");
 
+  // Preserve scroll position across sub-tab switches (AI/News/Financials/
+  // Technical/Chat all share one scroll container). onScroll tracks the
+  // offset continuously; useLayoutEffect restores it synchronously after
+  // the new tab's content is in the DOM but before the browser paints, so
+  // there's no visible jump back to the top.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPos = useRef(0);
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollPos.current;
+  }, [rightTab]);
+
   const { data: history, loading: histLoading } = usePriceHistory(stock.symbol, period);
   const action = stock.classification === "buy" ? "buy" : "watch";
   const { data: analysis, error: analysisError, loading: analysisLoading } = useAnalysis(stock.symbol, action);
@@ -50,7 +61,8 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div ref={scrollRef} onScroll={e => { scrollPos.current = e.currentTarget.scrollTop; }}
+      className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border flex-shrink-0 anim-fade-down">
         <div>
@@ -148,13 +160,7 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
       <div className="px-4 pt-3 flex-shrink-0">
         <div className="flex gap-1 bg-card2 rounded-lg p-0.5">
           {(["analysis", "news", "financials", "technicals", "chat"] as RightTab[]).map((tab) => (
-            <button key={tab} onClick={(e) => {
-                e.preventDefault();
-                const container = (e.currentTarget as HTMLElement).closest(".overflow-y-auto");
-                const scrollTop = container?.scrollTop ?? 0;
-                setRightTab(tab);
-                requestAnimationFrame(() => { if (container) container.scrollTop = scrollTop; });
-              }}
+            <button key={tab} onClick={() => setRightTab(tab)}
               className={clsx("flex-1 py-1.5 rounded-md text-xs font-medium transition-colors",
                 rightTab === tab ? "bg-white/10 text-white" : "text-muted hover:text-white")}>
               {tab === "analysis" ? "AI" : tab === "news" ? "News" : tab === "financials" ? "Financials" : tab === "technicals" ? "Technical" : "Chat"}

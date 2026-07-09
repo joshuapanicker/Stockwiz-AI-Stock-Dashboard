@@ -404,19 +404,11 @@ export default function App() {
         {/* ── TAB 1: Stock Analysis ── */}
         {tab === "analysis" && (
           <div key="analysis" className="flex flex-col flex-1 min-h-0 p-3 pt-8 gap-2 anim-fade-in">
-            {/* Top bar — market info + hidden widget chips */}
+            {/* Top bar — market info */}
             <div className="flex items-center flex-shrink-0 gap-3 min-w-0 anim-fade-down">
               <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                 <MarketBar market={market} />
               </div>
-              {slots.length < MAX_SLOTS && (
-                <button onClick={addSlot}
-                  title="Add a chart widget"
-                  className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full bg-white/5 border border-border/60 text-muted hover:text-green hover:border-green/30 transition-colors flex-shrink-0">
-                  <Plus size={10} />
-                  Add chart
-                </button>
-              )}
             </div>
 
             {/* Main split */}
@@ -424,6 +416,18 @@ export default function App() {
 
               {/* Left: charts + table */}
               <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2 pr-1 overflow-hidden">
+                {/* Add-chart control — sits directly above the chart grid it affects */}
+                {slots.length < MAX_SLOTS && (
+                  <div className="flex justify-end flex-shrink-0">
+                    <button onClick={addSlot}
+                      title="Add a chart widget"
+                      className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full bg-white/5 border border-border/60 text-muted hover:text-green hover:border-green/30 transition-colors">
+                      <Plus size={10} />
+                      Add chart
+                    </button>
+                  </div>
+                )}
+
                 {/* Chart rows — two widgets per row; each row's split and
                     height are adjustable by dragging its side/bottom handles */}
                 {slotRows.map((row, rowIdx) => {

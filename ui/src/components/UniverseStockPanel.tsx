@@ -5,7 +5,7 @@
  * in the screener's watchlist. Uses cached universe metrics instantly,
  * fetches price history on demand, and wires up AI analysis + chat.
  */
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import clsx from "clsx";
 import { X, ShoppingCart } from "lucide-react";
 import CandlestickChart from "./CandlestickChart";
@@ -37,6 +37,14 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
   const [buyPrice, setBuyPrice] = useState("");
   const [shares, setShares] = useState("1");
 
+  // Preserve scroll position across sub-tab switches — see StockDetailPanel
+  // for why this needs onScroll + useLayoutEffect rather than a click handler.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollPos = useRef(0);
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollPos.current;
+  }, [rightTab]);
+
   const { data: history, loading: histLoading } = usePriceHistory(symbol, period);
   const { data: analysis, loading: analysisLoading, error: analysisError } = useAnalysis(symbol, "buy");
 
@@ -49,7 +57,8 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div ref={scrollRef} onScroll={e => { scrollPos.current = e.currentTarget.scrollTop; }}
+      className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-border flex-shrink-0 anim-fade-down">
         <div>
