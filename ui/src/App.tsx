@@ -156,13 +156,35 @@ export default function App() {
     document.body.style.cursor = "grabbing";
     let currentDrop: number | null = null;
 
+    // Three CSS rules fight the inline drag transform and must be neutralized
+    // for the card to actually follow the cursor:
+    //  - .anim-fade-up (fill-mode: both) keeps its final keyframe transform
+    //    applied at animation priority, which overrides style.transform
+    //  - .chart-card's hover transition would rubber-band the movement
+    //  - ancestor overflow clipping would hide the card outside the grid
+    const unclip: { node: HTMLElement; overflow: string }[] = [];
+    if (el) {
+      el.style.animation = "none";
+      el.style.transition = "none";
+      el.style.willChange = "transform";
+      el.style.zIndex = "60";
+      el.style.pointerEvents = "none";
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        if (getComputedStyle(p).overflow !== "visible") {
+          unclip.push({ node: p, overflow: p.style.overflow });
+          p.style.overflow = "visible";
+        }
+        p = p.parentElement;
+      }
+    }
+
     function onMove(ev: MouseEvent) {
       if (el) {
-        // Transform moves the card visually without disturbing layout —
-        // no ghost image, the actual chart travels with the cursor
-        el.style.transform = `translate(${ev.clientX - startX}px, ${ev.clientY - startY}px) scale(1.02)`;
-        el.style.zIndex = "60";
-        el.style.pointerEvents = "none";
+        // The actual card travels with the cursor — no ghost image
+        el.style.transform =
+          `translate(${ev.clientX - startX}px, ${ev.clientY - startY}px) scale(1.03) rotate(0.5deg)`;
+        el.style.boxShadow = "0 24px 60px rgba(0,0,0,0.6), 0 0 30px rgba(46,230,168,0.25)";
       }
       let found: number | null = null;
       slots.forEach((s, i) => {
@@ -184,7 +206,12 @@ export default function App() {
         el.style.transform = "";
         el.style.zIndex = "";
         el.style.pointerEvents = "";
+        el.style.animation = "";
+        el.style.transition = "";
+        el.style.willChange = "";
+        el.style.boxShadow = "";
       }
+      unclip.forEach(({ node, overflow }) => { node.style.overflow = overflow; });
       if (currentDrop != null) reorderSlots(fromIdx, currentDrop);
       setDragIdx(null);
       setDropIdx(null);
