@@ -31,26 +31,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setAuthToken(session?.access_token ?? null);
       setLoading(false);
+
+      // SIGNED_IN fires for password login, signup, and OAuth (Google)
+      // return — but NOT for a persisted session simply reloading (that's
+      // INITIAL_SESSION) or a background TOKEN_REFRESHED. Single source of
+      // truth for the sign-in notification, covering every auth method.
+      if (event === "SIGNED_IN" && session) {
+        fetch(`${API_BASE}/internal/notify-signin`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).catch(() => {});
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && data.session) {
-      // Fire-and-forget: notify the host. Uses the fresh session token
-      // directly since the module-level cached token may not be set yet.
-      fetch(`${API_BASE}/internal/notify-signin`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${data.session.access_token}` },
-      }).catch(() => {});
-    }
+    // Sign-in notification is handled centrally by the SIGNED_IN branch of
+    // onAuthStateChange above, so every auth method (password, Google) is
+    // covered by one code path instead of duplicating the call here.
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   }
 
