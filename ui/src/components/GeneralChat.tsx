@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Plus, MessageSquare, Trash2, ChevronRight } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Send, Bot, User, Plus, MessageSquare, Trash2, ChevronRight, X } from "lucide-react";
 import clsx from "clsx";
 import { apiFetch, API_BASE, getAuthHeaders, parseApiError } from "../hooks/useApi";
+import { useIsMobile } from "../hooks/useIsMobile";
 import TypewriterMessage from "./TypewriterMessage";
 
 interface Message { role: "user" | "assistant"; content: string; }
@@ -75,7 +77,11 @@ export default function GeneralChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const isMobile = useIsMobile();
+  // On mobile the chats list is a floating drawer, so it starts closed
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 767px)").matches
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -141,12 +147,14 @@ export default function GeneralChat() {
     abortRef.current?.abort();
     const s = createSession(sessionsRef.current);
     setActiveId(s.id); setMessages([]); setInput("");
+    if (isMobile) setSidebarOpen(false);
   }
 
   function selectSession(id: string) {
     abortRef.current?.abort();
     const s = sessionsRef.current.find(x => x.id === id);
     setActiveId(id); setMessages(s?.messages ?? []); setInput("");
+    if (isMobile) setSidebarOpen(false);
   }
 
   function formatDate(ts: number) {
@@ -156,49 +164,79 @@ export default function GeneralChat() {
     return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
+  // Shared between the desktop inline column and the mobile floating drawer
+  const sidebarInner = (
+    <>
+      <div className="flex items-center justify-between px-3 pt-4 pb-3 flex-shrink-0">
+        <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Chats</span>
+        <div className="flex items-center gap-1.5">
+          <button onClick={newChat} className="w-6 h-6 rounded-lg bg-green/10 hover:bg-green/20 text-green flex items-center justify-center transition-colors">
+            <Plus size={12} />
+          </button>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)}
+              className="w-6 h-6 rounded-lg bg-white/5 hover:bg-white/10 text-muted hover:text-white flex items-center justify-center transition-colors">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+        {sessions.length === 0 ? (
+          <p className="text-muted text-xs px-2 py-4 text-center">No chats yet</p>
+        ) : sessions.map(s => (
+          <div key={s.id} onClick={() => selectSession(s.id)}
+            className={clsx("group flex items-center gap-2 px-2 py-2 rounded-xl cursor-pointer transition-colors",
+              activeId === s.id ? "bg-white/8 text-white" : "text-muted hover:bg-white/5 hover:text-white")}>
+            <MessageSquare size={12} className="flex-shrink-0 opacity-60" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs truncate">{s.title}</p>
+              <p className="text-[10px] text-muted/60">{formatDate(s.createdAt)}</p>
+            </div>
+            <button onClick={e => {
+              e.stopPropagation();
+              const left = sessionsRef.current.filter(x => x.id !== s.id);
+              deleteSession(sessionsRef.current, s.id);
+              if (activeId === s.id) {
+                if (left.length > 0) { setActiveId(left[0].id); setMessages(left[0].messages); }
+                else { const fresh = createSession([]); setActiveId(fresh.id); setMessages([]); }
+              }
+            }} className="opacity-0 group-hover:opacity-100 text-muted hover:text-red transition-all flex-shrink-0">
+              <Trash2 size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0 overflow-hidden relative">
+    <div className="flex h-full min-h-0 overflow-hidden relative pt-10 md:pt-0">
       {/* Market Chat gradient */}
       <div className="fixed inset-0 pointer-events-none z-0 gradient-reveal"
         style={{ background: "radial-gradient(ellipse 120% 80% at 100% 0%, rgba(46,230,168,0.09) 0%, transparent 60%), radial-gradient(ellipse 120% 80% at 0% 100%, rgba(16,185,129,0.08) 0%, transparent 60%)" }}
       />
 
-      {/* Sidebar */}
-      <div className={clsx("relative z-10 flex flex-col border-r border-border/50 transition-all duration-200 flex-shrink-0",
-        sidebarOpen ? "w-56" : "w-0 overflow-hidden")}>
-        <div className="flex items-center justify-between px-3 pt-4 pb-3 flex-shrink-0">
-          <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Chats</span>
-          <button onClick={newChat} className="w-6 h-6 rounded-lg bg-green/10 hover:bg-green/20 text-green flex items-center justify-center transition-colors">
-            <Plus size={12} />
-          </button>
+      {/* Sidebar — inline resizable column on desktop */}
+      {!isMobile && (
+        <div className={clsx("relative z-10 flex flex-col border-r border-border/50 transition-all duration-200 flex-shrink-0",
+          sidebarOpen ? "w-56" : "w-0 overflow-hidden")}>
+          {sidebarInner}
         </div>
-        <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
-          {sessions.length === 0 ? (
-            <p className="text-muted text-xs px-2 py-4 text-center">No chats yet</p>
-          ) : sessions.map(s => (
-            <div key={s.id} onClick={() => selectSession(s.id)}
-              className={clsx("group flex items-center gap-2 px-2 py-2 rounded-xl cursor-pointer transition-colors",
-                activeId === s.id ? "bg-white/8 text-white" : "text-muted hover:bg-white/5 hover:text-white")}>
-              <MessageSquare size={12} className="flex-shrink-0 opacity-60" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs truncate">{s.title}</p>
-                <p className="text-[10px] text-muted/60">{formatDate(s.createdAt)}</p>
-              </div>
-              <button onClick={e => {
-                e.stopPropagation();
-                const left = sessionsRef.current.filter(x => x.id !== s.id);
-                deleteSession(sessionsRef.current, s.id);
-                if (activeId === s.id) {
-                  if (left.length > 0) { setActiveId(left[0].id); setMessages(left[0].messages); }
-                  else { const fresh = createSession([]); setActiveId(fresh.id); setMessages([]); }
-                }
-              }} className="opacity-0 group-hover:opacity-100 text-muted hover:text-red transition-all flex-shrink-0">
-                <Trash2 size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
+      )}
+
+      {/* Sidebar — floating drawer on mobile so the chat never gets squeezed.
+          Portaled to <body> to escape the tab wrapper's stacking context. */}
+      {isMobile && sidebarOpen && createPortal(
+        <>
+          <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm anim-fade-in"
+            onClick={() => setSidebarOpen(false)} />
+          <div className="fixed left-0 top-0 bottom-0 w-64 z-[95] bg-card border-r border-border/60 shadow-2xl flex flex-col anim-slide-left">
+            {sidebarInner}
+          </div>
+        </>,
+        document.body
+      )}
 
       {/* Main chat area */}
       <div className="relative z-10 flex flex-1 min-w-0 min-h-0">
@@ -319,9 +357,9 @@ export default function GeneralChat() {
         </div>
         </div>{/* end chat column */}
 
-        {/* Suggestions sidebar — only in chat state */}
+        {/* Suggestions sidebar — only in chat state, desktop only */}
         {messages.length > 0 && (
-          <div className="w-44 flex-shrink-0 border-l border-border/40 flex flex-col px-3 py-4 gap-2 overflow-y-auto">
+          <div className="w-44 flex-shrink-0 border-l border-border/40 hidden md:flex flex-col px-3 py-4 gap-2 overflow-y-auto">
             <p className="text-[10px] text-muted uppercase tracking-wider font-semibold px-1 mb-1">Suggestions</p>
             {SUGGESTIONS.map(s => (
               <button key={s.label} onClick={() => send(s.prompt)} disabled={streaming}

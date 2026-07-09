@@ -140,6 +140,10 @@ body {
 
 .tv-lightweight-charts { border-radius: 8px; overflow: hidden; }
 
+/* Hide the scrollbar entirely (mobile chart carousel — dots serve as the indicator) */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Gradient fade-in animation */
 @keyframes gradientReveal {
   from { opacity: 0; }

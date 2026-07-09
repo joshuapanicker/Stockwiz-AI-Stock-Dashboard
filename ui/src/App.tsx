@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { Briefcase, MessageSquare, BarChart2, User, Plus, GripVertical } from "lucide-react";
+import { Briefcase, MessageSquare, BarChart2, User, Plus, GripVertical, ChevronLeft, ChevronRight } from "lucide-react";
 
 import ChartWidget, { type ChartType } from "./components/ChartWidget";
 import UniverseTable from "./components/UniverseTable";
@@ -98,6 +99,15 @@ export default function App() {
   // show the stock detail as a full-screen overlay instead of a column
   const isMobile = useIsMobile();
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  // Mobile chart carousel — one chart per view, swipe or tap the arrows
+  const [mobileChartIdx, setMobileChartIdx] = useState(0);
+  const mobileCarouselRef = useRef<HTMLDivElement>(null);
+
+  const scrollToChart = (i: number) => {
+    const el = mobileCarouselRef.current;
+    const slide = el?.children[i] as HTMLElement | undefined;
+    slide?.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+  };
   const { data: creditsStatus } = useCredits();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("criteria");
@@ -446,24 +456,68 @@ export default function App() {
                 )}
               </div>
 
-              {/* Charts — stacked full-width, fixed height, no drag/resize */}
-              {slots.map(slot => (
-                <div key={slot.key}
-                  className="glass-card bg-card/60 rounded-2xl p-3 border border-border/50 overflow-hidden">
-                  <ChartWidget
-                    slotKey={slot.key}
-                    defaultType={slot.defaultType}
-                    history={featuredHistory}
-                    history6m={featuredHistory6m}
-                    symbol={activeSymbol}
-                    currentPrice={selectedStock?.metrics?.close_price ?? null}
-                    height={170}
-                    label={activeSymbol ?? "—"}
-                    loadingSkeleton={screenLoading && !featuredHistory.length}
-                    onRemove={() => removeSlot(slot.key)}
-                  />
+              {/* Chart carousel — one chart per view; swipe or use the side
+                  arrows. Keeps the screener visible right on page load. */}
+              {slots.length > 0 && (
+                <div className="relative">
+                  <div
+                    ref={mobileCarouselRef}
+                    onScroll={e => {
+                      const el = e.currentTarget;
+                      // slide width = container width, plus the 12px gap
+                      const i = Math.round(el.scrollLeft / (el.clientWidth + 12));
+                      setMobileChartIdx(Math.max(0, Math.min(i, slots.length - 1)));
+                    }}
+                    className="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar">
+                    {slots.map(slot => (
+                      <div key={slot.key}
+                        className="min-w-full snap-start glass-card bg-card/60 rounded-2xl p-3 border border-border/50 overflow-hidden">
+                        <ChartWidget
+                          slotKey={slot.key}
+                          defaultType={slot.defaultType}
+                          history={featuredHistory}
+                          history6m={featuredHistory6m}
+                          symbol={activeSymbol}
+                          currentPrice={selectedStock?.metrics?.close_price ?? null}
+                          height={180}
+                          label={activeSymbol ?? "—"}
+                          loadingSkeleton={screenLoading && !featuredHistory.length}
+                          onRemove={() => removeSlot(slot.key)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Edge arrows — indicate more charts to the left/right */}
+                  {mobileChartIdx > 0 && (
+                    <button onClick={() => scrollToChart(mobileChartIdx - 1)}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 backdrop-blur border border-border/60 flex items-center justify-center text-white/80"
+                      title="Previous chart">
+                      <ChevronLeft size={15} />
+                    </button>
+                  )}
+                  {mobileChartIdx < slots.length - 1 && (
+                    <button onClick={() => scrollToChart(mobileChartIdx + 1)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/50 backdrop-blur border border-border/60 flex items-center justify-center text-white/80"
+                      title="Next chart">
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
+
+                  {/* Position dots */}
+                  {slots.length > 1 && (
+                    <div className="flex justify-center gap-1.5 mt-2">
+                      {slots.map((s, i) => (
+                        <button key={s.key} onClick={() => scrollToChart(i)}
+                          className={clsx(
+                            "h-1.5 rounded-full transition-all",
+                            i === mobileChartIdx ? "w-4 bg-green" : "w-1.5 bg-white/20"
+                          )} />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
 
               {/* Search engine — tapping a stock opens the full-screen detail */}
               <div className="glass-card bg-card/60 rounded-2xl border border-border/50 overflow-hidden"
@@ -477,11 +531,15 @@ export default function App() {
               </div>
             </div>
 
-            {/* Full-screen stock detail overlay */}
-            {mobileDetailOpen && (
-              <div className="fixed inset-0 z-[70] bg-bg anim-fade-in">
+            {/* Full-screen stock detail overlay — portaled to <body> so it
+                paints ABOVE the fixed navbar/profile button (the tab content
+                wrapper is a lower stacking context, so any z-index inside it
+                would still lose to those fixed z-50 elements) */}
+            {mobileDetailOpen && createPortal(
+              <div className="fixed inset-0 z-[100] bg-bg anim-fade-in">
                 {renderDetailPanel(() => setMobileDetailOpen(false))}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         )}
