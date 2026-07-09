@@ -9,6 +9,8 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
+  linkGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -57,12 +59,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  // Fresh sign-in/sign-up via Google — the redirect comes back to the app,
+  // and detectSessionInUrl (set in lib/supabase.ts) picks up the session
+  // automatically, so no callback route is needed.
+  async function signInWithGoogle() {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    return { error: error?.message ?? null };
+  }
+
+  // Attach a Google identity to the CURRENTLY signed-in account (must be
+  // called while already authenticated, e.g. via password). This is the
+  // safe, explicit way to merge providers onto one account — the user_id
+  // never changes, so every table keyed on it (portfolios, criteria,
+  // alerts, Plaid connections...) stays intact. Requires "Allow manual
+  // linking of identities" enabled in Supabase Auth settings.
+  async function linkGoogle() {
+    const { error } = await supabase.auth.linkIdentity({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    return { error: error?.message ?? null };
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGoogle, linkGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );

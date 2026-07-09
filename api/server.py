@@ -963,6 +963,22 @@ def delete_account(user_id: str = Depends(get_current_user)):
 # POST to {RAILWAY_URL}/api/internal/hooks/new-user, with a custom header
 # "X-Webhook-Secret: <SIGNUP_WEBHOOK_SECRET>" matching the Railway env var.
 
+class ValidateEmailRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/auth/validate-email")
+def validate_email(req: ValidateEmailRequest):
+    """
+    Pre-signup check: does this email's domain look real? Catches typos and
+    fabricated domains without sending anything. Public endpoint — runs
+    before the user has a session.
+    """
+    from core.email_validation import has_valid_mx
+    valid, reason = has_valid_mx(req.email)
+    return {"valid": valid, "reason": reason}
+
+
 @app.post("/api/internal/hooks/new-user")
 async def new_user_hook(request: Request):
     secret = os.environ.get("SIGNUP_WEBHOOK_SECRET", "").strip()

@@ -9,3 +9,4 @@ lxml
 anyio
 httpx
 plaid-python
+dnspython

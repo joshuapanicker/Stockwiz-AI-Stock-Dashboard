@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2, AlertTriangle, Trash2, Zap, Eye, EyeOff, KeyRound, Target } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2, AlertTriangle, Trash2, Zap, Eye, EyeOff, KeyRound, Target, Link2 } from "lucide-react";
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
 import AlertsEditor from "./AlertsEditor";
 import PlaidConnect from "./PlaidConnect";
 import { apiFetch, useProfile, useCredits, useTrackRecord, type TrackRecordBucket } from "../hooks/useApi";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
 export type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security" | "credits" | "track_record";
 
@@ -423,6 +424,56 @@ function AiCreditsSection() {
   );
 }
 
+// ── Connected accounts (identity linking) ─────────────────────────────────
+
+function ConnectedAccountsSection() {
+  const { linkGoogle } = useAuth();
+  const [providers, setProviders] = useState<string[] | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadIdentities() {
+    const { data } = await supabase.auth.getUserIdentities();
+    setProviders((data?.identities ?? []).map(i => i.provider));
+  }
+
+  useEffect(() => { loadIdentities(); }, []);
+
+  const hasGoogle = providers?.includes("google") ?? false;
+
+  async function handleLink() {
+    setError(null);
+    setLinking(true);
+    const { error } = await linkGoogle();
+    if (error) { setError(error); setLinking(false); }
+    // On success Supabase redirects to Google, then back to the app.
+  }
+
+  return (
+    <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-5 mt-6">
+      <p className="text-white font-semibold text-sm mb-1">Connected Accounts</p>
+      <p className="text-muted text-xs mb-4">
+        Link Google so you can sign in either way — your portfolio, criteria, and
+        alerts all stay on this same account either way.
+      </p>
+      {providers === null ? (
+        <p className="text-muted text-xs">Loading...</p>
+      ) : hasGoogle ? (
+        <div className="flex items-center gap-2 text-xs text-green bg-green/10 border border-green/20 rounded-lg px-3 py-2 w-fit">
+          <Check size={13} /> Google account linked
+        </div>
+      ) : (
+        <button onClick={handleLink} disabled={linking}
+          className="flex items-center gap-2 text-xs font-semibold text-white bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-border/50 rounded-lg px-4 py-2.5 transition-colors">
+          {linking ? <RefreshCw size={13} className="animate-spin" /> : <Link2 size={13} />}
+          {linking ? "Redirecting..." : "Link Google Account"}
+        </button>
+      )}
+      {error && <p className="text-red text-xs mt-3">{error}</p>}
+    </div>
+  );
+}
+
 // ── Delete account ────────────────────────────────────────────────────────
 
 function DeleteAccountSection() {
@@ -636,6 +687,7 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
                   Password reset and session management will be available in a future update.
                 </p>
               </div>
+              <ConnectedAccountsSection />
               <DeleteAccountSection />
             </div>
           )}
