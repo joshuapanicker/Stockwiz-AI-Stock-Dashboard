@@ -247,19 +247,19 @@ function Row({ stock, rank, selected, onSelect }: {
       <td className="py-2 px-2 text-right font-mono text-white text-[11px]">
         {stock.close_price != null ? `$${stock.close_price.toFixed(2)}` : <span className="text-muted">—</span>}
       </td>
-      <td className="py-2 px-2 text-right text-[10px] text-white/60">
+      <td className="py-2 px-2 text-right text-[10px] text-white/60 hidden sm:table-cell">
         {stock.market_cap
           ? stock.market_cap >= 1e12 ? `${(stock.market_cap / 1e12).toFixed(1)}T`
           : stock.market_cap >= 1e9 ? `${(stock.market_cap / 1e9).toFixed(1)}B`
           : `${(stock.market_cap / 1e6).toFixed(0)}M` : "—"}
       </td>
-      <td className="py-2 px-2 text-right font-mono text-white/60 text-[10px]">
+      <td className="py-2 px-2 text-right font-mono text-white/60 text-[10px] hidden sm:table-cell">
         {stock.forward_pe != null ? `${stock.forward_pe.toFixed(1)}x` : "—"}
       </td>
       <td className={clsx("py-2 px-2 text-right text-[10px]", revColor)}>
         {revGrowth != null ? `${revGrowth >= 0 ? "+" : ""}${(revGrowth * 100).toFixed(1)}%` : "—"}
       </td>
-      <td className="py-2 px-2 text-right text-[10px]">
+      <td className="py-2 px-2 text-right text-[10px] hidden sm:table-cell">
         {stock.distance_to_low_pct != null
           ? <span className={stock.distance_to_low_pct < 0.2 ? "text-green" : "text-white/40"}>
               +{(stock.distance_to_low_pct * 100).toFixed(1)}%
@@ -679,10 +679,10 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
                     <th className="text-center py-1.5 px-2 font-medium w-6">#</th>
                     <th className="text-left py-1.5 px-2 font-medium">Symbol</th>
                     <th className="text-right py-1.5 px-2 font-medium">Price</th>
-                    <th className="text-right py-1.5 px-2 font-medium">Cap</th>
-                    <th className="text-right py-1.5 px-2 font-medium">Fwd PE</th>
+                    <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">Cap</th>
+                    <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">Fwd PE</th>
                     <th className="text-right py-1.5 px-2 font-medium">Rev Growth</th>
-                    <th className="text-right py-1.5 px-2 font-medium">52W Low+</th>
+                    <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">52W Low+</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -713,10 +713,10 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
                   <th className="text-center py-1.5 px-2 font-medium w-6">#</th>
                   <th className="text-left py-1.5 px-2 font-medium">Symbol</th>
                   <th className="text-right py-1.5 px-2 font-medium">Price</th>
-                  <th className="text-right py-1.5 px-2 font-medium">Cap</th>
-                  <th className="text-right py-1.5 px-2 font-medium">Fwd PE</th>
+                  <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">Cap</th>
+                  <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">Fwd PE</th>
                   <th className="text-right py-1.5 px-2 font-medium">Rev Growth</th>
-                  <th className="text-right py-1.5 px-2 font-medium">52W Low+</th>
+                  <th className="text-right py-1.5 px-2 font-medium hidden sm:table-cell">52W Low+</th>
                 </tr>
               </thead>
               <tbody>

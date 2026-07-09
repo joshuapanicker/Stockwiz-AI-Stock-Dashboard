@@ -14,6 +14,7 @@ import SettingsPage, { type SettingsTab } from "./components/SettingsPage";
 
 import { useScreener, usePriceHistory, usePortfolio, useMarket, useCredits } from "./hooks/useApi";
 import { usePersistedNumber, makeDragger } from "./hooks/usePersistedNumber";
+import { useIsMobile } from "./hooks/useIsMobile";
 import type { ScreenedStock, HoldingWithMetrics } from "./types";
 
 type Tab = "analysis" | "portfolio" | "chat";
@@ -93,6 +94,10 @@ export default function App() {
   const [selectedUniverseMetrics, setSelectedUniverseMetrics] = useState<any | null>(null);
   const [rightWidth, setRightWidth] = usePersistedNumber("pulse_analysis_right_w", 340);
   const [profileOpen, setProfileOpen] = useState(false);
+  // On phones the side-by-side layout is unusable — stack everything and
+  // show the stock detail as a full-screen overlay instead of a column
+  const isMobile = useIsMobile();
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const { data: creditsStatus } = useCredits();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("criteria");
@@ -355,6 +360,30 @@ export default function App() {
   const slotRows: SlotDef[][] = [];
   for (let i = 0; i < slots.length; i += 2) slotRows.push(slots.slice(i, i + 2));
 
+  // Detail panel — shared between the desktop right column and the mobile
+  // full-screen overlay (only the close behavior differs)
+  const renderDetailPanel = (onClose: () => void) =>
+    selectedStock ? (
+      <StockDetailPanel stock={selectedStock} onClose={onClose} onAddToPortfolio={addHolding} />
+    ) : activeSymbol ? (
+      <UniverseStockPanel
+        symbol={activeSymbol}
+        cachedMetrics={selectedUniverseMetrics}
+        onClose={onClose}
+        onAddToPortfolio={addHolding}
+      />
+    ) : (
+      <div className="flex items-center justify-center h-full text-muted text-xs">
+        Select a stock
+      </div>
+    );
+
+  const handleTableSelect = (s: string, metrics?: any | null) => {
+    setSelectedSymbol(s);
+    setSelectedUniverseMetrics(metrics ?? null);
+    if (isMobile) setMobileDetailOpen(true);
+  };
+
   return (
     <div className="h-screen bg-bg text-white font-sans flex flex-col overflow-hidden">
 
@@ -401,8 +430,64 @@ export default function App() {
       {/* ── Tab content — full height, nav floats above ── */}
       <div className="flex-1 min-h-0 flex flex-col relative z-10">
 
-        {/* ── TAB 1: Stock Analysis ── */}
-        {tab === "analysis" && (
+        {/* ── TAB 1: Stock Analysis — MOBILE (stacked, detail as overlay) ── */}
+        {tab === "analysis" && isMobile && (
+          <div key="analysis-mobile" className="flex-1 min-h-0 overflow-y-auto pt-14 px-3 pb-4 anim-fade-in">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2 overflow-x-auto">
+                <MarketBar market={market} />
+                {slots.length < MAX_SLOTS && (
+                  <button onClick={addSlot}
+                    title="Add a chart widget"
+                    className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full bg-white/5 border border-border/60 text-muted flex-shrink-0">
+                    <Plus size={10} />
+                    Add chart
+                  </button>
+                )}
+              </div>
+
+              {/* Charts — stacked full-width, fixed height, no drag/resize */}
+              {slots.map(slot => (
+                <div key={slot.key}
+                  className="glass-card bg-card/60 rounded-2xl p-3 border border-border/50 overflow-hidden">
+                  <ChartWidget
+                    slotKey={slot.key}
+                    defaultType={slot.defaultType}
+                    history={featuredHistory}
+                    history6m={featuredHistory6m}
+                    symbol={activeSymbol}
+                    currentPrice={selectedStock?.metrics?.close_price ?? null}
+                    height={170}
+                    label={activeSymbol ?? "—"}
+                    loadingSkeleton={screenLoading && !featuredHistory.length}
+                    onRemove={() => removeSlot(slot.key)}
+                  />
+                </div>
+              ))}
+
+              {/* Search engine — tapping a stock opens the full-screen detail */}
+              <div className="glass-card bg-card/60 rounded-2xl border border-border/50 overflow-hidden"
+                style={{ height: "72vh" }}>
+                <UniverseTable
+                  selected={selectedSymbol}
+                  onSelect={handleTableSelect}
+                  onFirstLoad={s => setSelectedSymbol(s)}
+                  onOpenCriteria={() => openSettings("criteria")}
+                />
+              </div>
+            </div>
+
+            {/* Full-screen stock detail overlay */}
+            {mobileDetailOpen && (
+              <div className="fixed inset-0 z-[70] bg-bg anim-fade-in">
+                {renderDetailPanel(() => setMobileDetailOpen(false))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 1: Stock Analysis — DESKTOP ── */}
+        {tab === "analysis" && !isMobile && (
           <div key="analysis" className="flex flex-col flex-1 min-h-0 p-3 pt-8 gap-2 anim-fade-in">
             {/* Top bar — market info */}
             <div className="flex items-center flex-shrink-0 gap-3 min-w-0 anim-fade-down">
@@ -459,7 +544,7 @@ export default function App() {
                 <div className="glass-card bg-card/60 rounded-2xl border border-border/50 flex flex-col flex-1 min-h-0 overflow-hidden min-w-0 anim-fade-up" style={{ animationDelay: "150ms" }}>
                   <UniverseTable
                     selected={selectedSymbol}
-                    onSelect={(s, metrics) => { setSelectedSymbol(s); setSelectedUniverseMetrics(metrics ?? null); }}
+                    onSelect={handleTableSelect}
                     onFirstLoad={s => setSelectedSymbol(s)}
                     onOpenCriteria={() => openSettings("criteria")}
                   />
@@ -478,20 +563,7 @@ export default function App() {
                 style={{ width: rightWidth, minWidth: 180, maxWidth: "calc(100vw - 320px)" }}
                 className="flex-shrink-0 flex flex-col min-h-0 overflow-hidden anim-slide-right">
                 <div className="glass-card bg-card/60 rounded-2xl border border-border/50 overflow-hidden flex-1 min-h-0">
-                  {selectedStock ? (
-                    <StockDetailPanel stock={selectedStock} onClose={() => setSelectedSymbol("AAPL")} onAddToPortfolio={addHolding} />
-                  ) : activeSymbol ? (
-                    <UniverseStockPanel
-                      symbol={activeSymbol}
-                      cachedMetrics={selectedUniverseMetrics}
-                      onClose={() => setSelectedSymbol("AAPL")}
-                      onAddToPortfolio={addHolding}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted text-xs">
-                      Select a stock
-                    </div>
-                  )}
+                  {renderDetailPanel(() => setSelectedSymbol("AAPL"))}
                 </div>
               </div>
             </div>

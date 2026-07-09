@@ -13,6 +13,7 @@ import TickerLogo from "./TickerLogo";
 import AnalysisCard from "./AnalysisCard";
 import { useAnalysis, useUniverseSignals, useSoldPositions } from "../hooks/useApi";
 import { usePersistedNumber, makeDragger } from "../hooks/usePersistedNumber";
+import { useIsMobile } from "../hooks/useIsMobile";
 import type { HoldingWithMetrics } from "../types";
 
 interface Props {
@@ -173,7 +174,7 @@ function HoldingRow({
               {h.gain_pct != null ? `${gainUp ? "+" : ""}${(h.gain_pct * 100).toFixed(2)}%` : "—"}
             </p>
           </div>
-          <div className="text-right w-28">
+          <div className="text-right w-28 hidden sm:block">
             <p className={clsx("font-mono text-sm font-semibold", gainUp ? "text-green" : "text-red")}>
               {h.gain_abs != null ? `${gainUp ? "+" : ""}$${Math.abs(h.gain_abs).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
             </p>
@@ -207,7 +208,7 @@ function HoldingRow({
       {expanded && (
         <div className="border-t border-border/30 px-5 pb-5 pt-4 space-y-4">
           {h.history?.length > 0 && <PortfolioChart data={h.history} buyPrice={h.buy_price} height={200} />}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Buy Price", value: h.buy_price != null ? `$${h.buy_price.toFixed(2)}` : "—" },
               { label: "Shares", value: h.shares != null ? String(h.shares) : "1" },
@@ -325,6 +326,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
   const [bulkDeleting, setBulkDeleting] = useState(false);
   // User-resizable right panel (screener signals) — persisted across sessions
   const [rightWidth, setRightWidth] = usePersistedNumber("pulse_portfolio_right_w", 420);
+  const isMobile = useIsMobile();
   const onDividerDrag = makeDragger(setRightWidth, () => rightWidth, "x",
     (d, s) => Math.min(640, Math.max(280, s - d)));
   const netEarnings = holdings.reduce((s, h) => s + (h.gain_abs ?? 0), 0);
@@ -446,14 +448,14 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
       />
 
       {/* ── Hero section ── */}
-      <div className="relative z-10 overflow-hidden px-8 pt-10 pb-8 anim-fade-down">
+      <div className="relative z-10 overflow-hidden px-4 pt-14 pb-5 md:px-8 md:pt-10 md:pb-8 anim-fade-down">
 
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <p className="text-muted text-sm mb-1">Total Portfolio Value</p>
             <div className="flex items-end gap-4">
               <h1 className={clsx(
-                "text-5xl font-bold font-mono tracking-tight",
+                "text-3xl md:text-5xl font-bold font-mono tracking-tight",
                 !hasData ? "text-white" : gainUp ? "text-green" : "text-red"
               )}>
                 {hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—"}
@@ -553,11 +555,11 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
 
       </div>
 
-      {/* ── Two-column split — always shown ── */}
-      <div className="relative z-10 flex min-h-0 flex-1 gap-0 px-4 pb-6">
+      {/* ── Two-column split — stacks vertically on mobile ── */}
+      <div className="relative z-10 flex flex-col md:flex-row min-h-0 flex-1 gap-0 px-4 pb-6 overflow-y-auto md:overflow-visible">
 
         {/* ── LEFT: charts + stats + holdings ── */}
-        <div className="flex-1 min-w-0 overflow-y-auto pr-3 space-y-5">
+        <div className="flex-1 min-w-0 md:overflow-y-auto md:pr-3 space-y-5">
 
           {holdings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -570,8 +572,8 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
           ) : (
             <>
             {/* Charts row */}
-            <div className="grid grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
-              <div className="chart-card col-span-2 glass-card bg-card2/70 rounded-2xl border border-border/40 p-5 flex flex-col">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 anim-fade-up" style={{ animationDelay: "80ms" }}>
+              <div className="chart-card md:col-span-2 glass-card bg-card2/70 rounded-2xl border border-border/40 p-5 flex flex-col">
                 <div className="mb-4 flex-shrink-0">
                   <p className="text-white font-semibold text-sm">Portfolio Performance</p>
                   <p className="text-muted text-xs mt-0.5">Combined value over time</p>
@@ -638,7 +640,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-4 gap-3 stagger anim-fade-up" style={{ animationDelay: "160ms" }}>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger anim-fade-up" style={{ animationDelay: "160ms" }}>
               {[
                 { label: "Net P&L", value: hasData ? `${gainUp ? "+" : ""}$${Math.abs(netEarnings).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—",
                   color: !hasData ? "text-muted" : gainUp ? "text-green" : "text-red", sub: "Unrealized earnings" },
@@ -801,7 +803,7 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
                         </p>
                         {pct && <p className={clsx("text-[10px] font-mono", gainUp ? "text-green/70" : "text-red/70")}>{pct}</p>}
                       </div>
-                      <div className="text-right text-xs text-muted w-24">
+                      <div className="text-right text-xs text-muted w-24 hidden sm:block">
                         <p>Bought @ ${p.buy_price?.toFixed(2) ?? "—"}</p>
                         <p>{p.buy_date ?? ""}</p>
                       </div>
@@ -813,16 +815,17 @@ export default function PortfolioTab({ holdings, loading, onAdd, onRemove, onRem
           )}
         </div>{/* end left column */}
 
-          {/* ── Draggable vertical divider ── */}
+          {/* ── Draggable vertical divider (desktop only) ── */}
           <div onMouseDown={onDividerDrag}
             title="Drag to resize panel"
-            className="divider-handle w-1.5 flex-shrink-0 cursor-col-resize flex items-center justify-center mx-1">
+            className="divider-handle w-1.5 flex-shrink-0 cursor-col-resize hidden md:flex items-center justify-center mx-1">
             <div className="divider-line w-0.5 h-full bg-border/50 rounded-full transition-colors" />
           </div>
 
-          {/* ── RIGHT: screener signals — user-resizable ── */}
-          <div style={{ width: rightWidth, minWidth: 280, maxWidth: 640 }}
-            className="flex-shrink-0 overflow-y-auto pl-4 space-y-4">
+          {/* ── RIGHT: screener signals — resizable column on desktop,
+              full-width section below the holdings on mobile ── */}
+          <div style={isMobile ? undefined : { width: rightWidth, minWidth: 280, maxWidth: 640 }}
+            className="flex-shrink-0 md:overflow-y-auto pl-0 pt-6 md:pl-4 md:pt-0 space-y-4">
             <div className="pt-1 pb-1 flex items-center justify-between sticky top-0 bg-bg z-10">
               <div>
                 <p className="text-white font-semibold text-sm">Screener Signals</p>

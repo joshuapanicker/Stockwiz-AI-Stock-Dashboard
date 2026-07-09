@@ -78,7 +78,7 @@ function ProfileEditor() {
         <p className="text-muted text-xs mb-4">This gets injected into every AI analysis and chat response, personalizing it to your strategy.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
           <label className={labelCls}>Risk Tolerance</label>
           <select value={form.risk_tolerance} onChange={e => set("risk_tolerance", e.target.value)} className={inp}>
@@ -240,12 +240,12 @@ function TrackRecordSection() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             {HORIZONS.map(h => (
               <TrackRecordCard key={`buy-${h.key}`} action="buy" horizon={h.label} bucket={data.summary[`buy_${h.key}`]} />
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
             {HORIZONS.map(h => (
               <TrackRecordCard key={`sell-${h.key}`} action="sell" horizon={h.label} bucket={data.summary[`sell_${h.key}`]} />
             ))}
@@ -532,14 +532,14 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
         <p className="text-white font-semibold">Settings</p>
       </div>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
 
-        {/* Sidebar tabs */}
-        <div className="w-52 flex-shrink-0 border-r border-border/50 py-4 px-3 space-y-1">
+        {/* Sidebar tabs — horizontal scrollable chips on mobile */}
+        <div className="w-full md:w-52 flex-shrink-0 border-b md:border-b-0 md:border-r border-border/50 py-2 md:py-4 px-3 flex md:flex-col gap-1 md:gap-0 md:space-y-1 overflow-x-auto md:overflow-x-visible">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
               className={clsx(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors text-left",
+                "w-auto md:w-full flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-xl text-sm transition-colors text-left whitespace-nowrap flex-shrink-0",
                 activeTab === t.id
                   ? "bg-green/10 text-green border border-green/20"
                   : "text-muted hover:text-white hover:bg-white/5"
@@ -551,7 +551,7 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
+        <div className="flex-1 min-w-0 overflow-y-auto px-4 md:px-8 py-6">
 
           {/* ── Investment Profile ── */}
           {activeTab === "profile" && (
