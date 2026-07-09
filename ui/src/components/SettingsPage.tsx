@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2, AlertTriangle, Trash2, Zap, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDown, Check, Building2, AlertTriangle, Trash2, Zap, Eye, EyeOff, KeyRound, Target } from "lucide-react";
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
 import AlertsEditor from "./AlertsEditor";
 import PlaidConnect from "./PlaidConnect";
-import { apiFetch, useProfile, useCredits } from "../hooks/useApi";
+import { apiFetch, useProfile, useCredits, useTrackRecord, type TrackRecordBucket } from "../hooks/useApi";
 import { useAuth } from "../context/AuthContext";
 
-export type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security" | "credits";
+export type SettingsTab = "profile" | "criteria" | "notifications" | "brokerage" | "security" | "credits" | "track_record";
 
 interface Props {
   open: boolean;
@@ -22,6 +22,7 @@ const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "notifications", label: "Alerts",             icon: <Bell size={14} /> },
   { id: "brokerage",     label: "Brokerage",          icon: <Building2 size={14} /> },
   { id: "credits",       label: "AI Credits",         icon: <Zap size={14} /> },
+  { id: "track_record",  label: "AI Track Record",    icon: <Target size={14} /> },
   { id: "security",      label: "Security",           icon: <Shield size={14} /> },
 ];
 
@@ -156,6 +157,150 @@ function ProfileEditor() {
     </div>
   );
 }
+// ── AI Track Record ──────────────────────────────────────────────────────
+
+const HORIZONS: { key: "30d" | "90d" | "180d"; label: string }[] = [
+  { key: "30d", label: "30 days" },
+  { key: "90d", label: "90 days" },
+  { key: "180d", label: "180 days" },
+];
+
+function fmtPct(v: number | null | undefined): string {
+  if (v == null) return "—";
+  return `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
+}
+
+function TrackRecordCard({ action, horizon, bucket }: {
+  action: "buy" | "sell"; horizon: string; bucket?: TrackRecordBucket;
+}) {
+  const hasData = !!bucket && bucket.count > 0;
+  const winUp = (bucket?.win_rate ?? 0) >= 0.5;
+  return (
+    <div className="bg-card2 rounded-2xl border border-border/40 px-4 py-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className={clsx(
+          "text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full",
+          action === "buy" ? "bg-green/10 text-green" : "bg-red/10 text-red"
+        )}>
+          {action}
+        </span>
+        <span className="text-muted text-[10px]">{horizon}</span>
+      </div>
+      {!hasData ? (
+        <p className="text-muted text-xs py-2">Not enough resolved calls yet</p>
+      ) : (
+        <>
+          <p className={clsx("font-mono text-2xl font-bold", (bucket!.avg_return ?? 0) >= 0 ? "text-green" : "text-red")}>
+            {fmtPct(bucket!.avg_return)}
+          </p>
+          <p className="text-muted text-[10px] mt-0.5">avg return · {bucket!.count} call{bucket!.count === 1 ? "" : "s"}</p>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30 text-[11px]">
+            <span className="text-muted">Win rate</span>
+            <span className={clsx("font-mono font-semibold", winUp ? "text-green" : "text-white/70")}>
+              {bucket!.win_rate != null ? `${(bucket!.win_rate * 100).toFixed(0)}%` : "—"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between mt-1 text-[11px]">
+            <span className="text-muted">vs SPY</span>
+            <span className={clsx("font-mono font-semibold", (bucket!.avg_alpha_vs_spy ?? 0) >= 0 ? "text-green" : "text-red")}>
+              {fmtPct(bucket!.avg_alpha_vs_spy)}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TrackRecordSection() {
+  const { data, loading } = useTrackRecord();
+
+  return (
+    <div className="max-w-3xl">
+      <h2 className="text-white font-bold text-xl mb-2">AI Track Record</h2>
+      <p className="text-muted text-sm mb-8">
+        Every time the AI recommends buying or selling a stock, that call is logged with the price
+        at that moment — once per stock per day. This page shows what actually happened afterward,
+        measured against real historical prices with SPY shown alongside as a benchmark. Nothing here
+        is editable or removable after the fact.
+      </p>
+
+      {loading ? (
+        <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-8 text-center text-muted text-sm">
+          Loading track record...
+        </div>
+      ) : !data || data.total_calls_logged === 0 ? (
+        <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-8 flex flex-col items-center gap-2 text-center">
+          <Target size={24} className="text-muted" />
+          <p className="text-white font-semibold text-sm">No calls logged yet</p>
+          <p className="text-muted text-xs max-w-xs">
+            This just started tracking — every buy/sell verdict the AI issues from now on builds this
+            record. Check back as calls resolve.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            {HORIZONS.map(h => (
+              <TrackRecordCard key={`buy-${h.key}`} action="buy" horizon={h.label} bucket={data.summary[`buy_${h.key}`]} />
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-8">
+            {HORIZONS.map(h => (
+              <TrackRecordCard key={`sell-${h.key}`} action="sell" horizon={h.label} bucket={data.summary[`sell_${h.key}`]} />
+            ))}
+          </div>
+
+          {data.recent_calls.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">Recent calls</p>
+              <div className="bg-card2 rounded-2xl border border-border/40 overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-muted border-b border-border/40 text-[10px]">
+                      <th className="text-left py-2 px-3 font-medium">Symbol</th>
+                      <th className="text-left py-2 px-3 font-medium">Call</th>
+                      <th className="text-left py-2 px-3 font-medium">Date</th>
+                      <th className="text-right py-2 px-3 font-medium">30d</th>
+                      <th className="text-right py-2 px-3 font-medium">90d</th>
+                      <th className="text-right py-2 px-3 font-medium">180d</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recent_calls.slice(0, 20).map((c, i) => (
+                      <tr key={`${c.symbol}-${c.call_date}-${i}`} className="border-b border-border/20 last:border-0">
+                        <td className="py-2 px-3 font-mono font-semibold text-white">{c.symbol}</td>
+                        <td className="py-2 px-3">
+                          <span className={clsx(
+                            "text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded",
+                            c.action === "buy" ? "bg-green/10 text-green" : "bg-red/10 text-red"
+                          )}>
+                            {c.action}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-muted">{c.call_date}</td>
+                        {(["30d", "90d", "180d"] as const).map(h => {
+                          const v = (c as any)[`return_${h}`] as number | undefined;
+                          return (
+                            <td key={h} className={clsx("py-2 px-3 text-right font-mono",
+                              v == null ? "text-muted" : v >= 0 ? "text-green" : "text-red")}>
+                              {v == null ? "pending" : fmtPct(v)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── AI Credits ─────────────────────────────────────────────────────────────
 
 function AiCreditsSection() {
@@ -475,6 +620,9 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
 
           {/* ── AI Credits ── */}
           {activeTab === "credits" && <AiCreditsSection />}
+
+          {/* ── AI Track Record ── */}
+          {activeTab === "track_record" && <TrackRecordSection />}
 
           {/* ── Security ── */}
           {activeTab === "security" && (

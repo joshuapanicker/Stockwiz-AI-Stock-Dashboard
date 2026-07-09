@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   X, LogOut, User, Mail, Calendar, TrendingUp, TrendingDown,
-  Briefcase, Shield, Bell, Settings, ChevronRight, CircleDollarSign,
+  Briefcase, Shield, Bell, Settings, ChevronRight, CircleDollarSign, Target,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useCredits } from "../hooks/useApi";
@@ -195,6 +195,12 @@ export default function ProfilePanel({ open, onClose, onOpenSettings, portfolioS
               label="Security"
               sub="Password & sessions"
               onClick={() => { onClose(); onOpenSettings("security"); }}
+            />
+            <MenuRow
+              icon={<Target size={14} />}
+              label="AI Track Record"
+              sub="How buy/sell calls have actually performed"
+              onClick={() => { onClose(); onOpenSettings("track_record"); }}
             />
           </div>
 

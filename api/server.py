@@ -227,6 +227,22 @@ def predict(symbol: str, user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── AI track record ───────────────────────────────────────────────────────
+
+@app.get("/api/track-record")
+def track_record():
+    """
+    Public, unauthenticated scoreboard of how the AI's buy/sell verdicts
+    have actually performed against real price history vs SPY. No auth —
+    this is meant to be an honest, checkable record, not a per-user stat.
+    """
+    from core.cache import fetch_through
+    from core.track_record import compute_track_record
+    # Resolution touches historical price data for every logged call, so
+    # it's cached for an hour rather than recomputed on every page load.
+    return fetch_through("track_record", 3600, compute_track_record, stale_ttl=21600)
+
+
 # ── Chat — specific routes MUST come before wildcard /api/chat/{symbol} ──
 
 from fastapi.responses import StreamingResponse

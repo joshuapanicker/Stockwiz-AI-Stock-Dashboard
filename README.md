@@ -18,6 +18,7 @@ StockWiz combines live market data from Yahoo Finance with Claude AI to automate
 - **Stock Chat** — per-stock AI assistant with live metrics context and price prediction
 - **Financials Tab** — quarterly revenue and net income charts with YoY growth
 - **News & Earnings** — recent headlines and earnings calendar per stock
+- **AI Track Record** — every buy/sell verdict the AI issues is logged with the price at that moment; a public scoreboard tracks what actually happened 30/90/180 days later against real historical prices, benchmarked against SPY
 
 ### Portfolio
 - **Portfolio Tracker** — tracks holdings with real-time P&L, cost basis, gain per share, and total value
@@ -79,7 +80,7 @@ StockWiz combines live market data from Yahoo Finance with Claude AI to automate
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- A [Supabase](https://supabase.com) project with the schema from `supabase_setup.sql`, `supabase_alerts.sql`, and `supabase_plaid.sql`
+- A [Supabase](https://supabase.com) project with the schema from the `supabase_*.sql` files (see Database Setup below)
 - An [Anthropic API key](https://console.anthropic.com)
 - A [Plaid account](https://dashboard.plaid.com) (sandbox is free)
 
@@ -142,6 +143,9 @@ README-only changes do not trigger a Vercel rebuild.
 
 Run the following SQL files in order in the Supabase SQL editor:
 
-1. `supabase_setup.sql` — core tables (`portfolios`, `user_criteria`, `user_profiles`)
+1. `supabase_setup.sql` — core tables (`portfolios`, `user_criteria`, `user_profiles`, `sold_positions`)
 2. `supabase_alerts.sql` — `user_alerts` table
 3. `supabase_plaid.sql` — `plaid_connections` table (multi-row, supports multiple accounts per user)
+4. `supabase_credits.sql` — `user_ai_usage` and `user_api_keys` tables (AI credit metering, own-key opt-out)
+5. `supabase_sold_positions.sql` — standalone `sold_positions` migration (only needed if `supabase_setup.sql` predates the sell-history feature)
+6. `supabase_ai_calls.sql` — `ai_calls` table backing the public AI Track Record scoreboard

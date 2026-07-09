@@ -3,6 +3,7 @@
 from __future__ import annotations
 import json
 import os
+import re
 import anthropic
 
 from core.criteria import evaluate_criteria
@@ -54,6 +55,11 @@ Reasoning:
 Rules: use only provided data, say "missing" if absent, max 3 bullets."""
 
 
+def _parse_decision(text: str) -> str | None:
+    m = re.search(r"Decision:\s*(YES|NO)", text, re.IGNORECASE)
+    return m.group(1).upper() if m else None
+
+
 def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
                   user_id: str | None = None) -> dict:
     from concurrent.futures import ThreadPoolExecutor
@@ -97,13 +103,27 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
         messages=[{"role": "user", "content": prompt}],
     )
 
+    analysis_text = message.content[0].text if message.content else ""
     result = {
         "symbol": symbol,
         "action": action,
         "metrics": metrics,
         "market": market,
         "criteria_result": criteria_result,
-        "analysis_text": message.content[0].text if message.content else "",
+        "analysis_text": analysis_text,
     }
+
+    # Log the verdict for the public track record — best-effort, must never
+    # break the analysis response itself.
+    try:
+        decision = _parse_decision(analysis_text)
+        if decision:
+            from core.track_record import log_call
+            log_call(symbol, action, decision, metrics.get("close_price"),
+                     market.get("spy_latest"), criteria_result.get("rules_met"),
+                     criteria_result.get("rules_total"))
+    except Exception:
+        pass
+
     cache_set(cache_key, result)
     return result

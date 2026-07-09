@@ -402,6 +402,52 @@ export function useCredits() {
   return { data, loading, refresh, setKey, removeKey, keyError, savingKey };
 }
 
+// ── AI track record ─────────────────────────────────────────────────────
+
+export interface TrackRecordBucket {
+  count: number;
+  avg_return: number | null;
+  win_rate: number | null;
+  avg_alpha_vs_spy: number | null;
+}
+
+export interface TrackRecordCall {
+  symbol: string;
+  action: "buy" | "sell";
+  decision: string;
+  price_at_call: number;
+  spy_at_call: number | null;
+  rules_met: number | null;
+  rules_total: number | null;
+  call_date: string;
+  created_at: string;
+  return_30d?: number;
+  return_90d?: number;
+  return_180d?: number;
+  alpha_30d?: number;
+  alpha_90d?: number;
+  alpha_180d?: number;
+}
+
+export interface TrackRecord {
+  summary: Record<string, TrackRecordBucket>;
+  total_calls_logged: number;
+  recent_calls: TrackRecordCall[];
+}
+
+export function useTrackRecord() {
+  const [data, setData] = useState<TrackRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiFetch<TrackRecord>("/track-record")
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return { data, loading };
+}
+
 export function useSoldPositions() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
