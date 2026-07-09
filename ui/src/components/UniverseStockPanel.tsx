@@ -7,13 +7,14 @@
  */
 import { useState } from "react";
 import clsx from "clsx";
-import { X, ShoppingCart, RefreshCw } from "lucide-react";
+import { X, ShoppingCart } from "lucide-react";
 import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
 import StockChat from "./StockChat";
 import NewsPanel from "./NewsPanel";
 import FinancialsTab from "./FinancialsTab";
 import TechnicalsTab from "./TechnicalsTab";
+import AnalysisCard from "./AnalysisCard";
 import { usePriceHistory, useAnalysis, apiFetch } from "../hooks/useApi";
 import type { UniverseStock } from "../types";
 
@@ -166,21 +167,12 @@ export default function UniverseStockPanel({ symbol, cachedMetrics, onClose, onA
         </div>
       ) : rightTab === "analysis" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0 space-y-3">
-          {analysisLoading ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-muted animate-pulse flex items-center gap-2">
-              <RefreshCw size={11} className="animate-spin" /> Analyzing {symbol}...
-            </div>
-          ) : analysis?.analysis_text ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-white/80 leading-relaxed space-y-1">
-              {analysis.analysis_text.split("\n").filter(Boolean).map((line: string, i: number) => (
-                <p key={i} className={line.startsWith("-") ? "pl-2 text-white/60" : "text-white/80"}>{line}</p>
-              ))}
-            </div>
-          ) : analysisError ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-red/80">{analysisError}</div>
-          ) : (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-muted">Loading analysis...</div>
-          )}
+          <AnalysisCard
+            analysis={analysis}
+            loading={analysisLoading}
+            error={analysisError}
+            action="buy"
+          />
 
           {!showAddForm ? (
             <button onClick={() => setShowAddForm(true)}

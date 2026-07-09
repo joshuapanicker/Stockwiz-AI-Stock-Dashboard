@@ -10,6 +10,7 @@ import FinancialsTab from "./FinancialsTab";
 import TechnicalsTab from "./TechnicalsTab";
 import TickerLogo from "./TickerLogo";
 import SymbolSearch from "./SymbolSearch";
+import AnalysisCard from "./AnalysisCard";
 import { usePriceHistory, useAnalysis } from "../hooks/useApi";
 import type { ScreenedStock } from "../types";
 import { generateDepthData } from "../utils/mockDepth";
@@ -143,21 +144,6 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
         ))}
       </div>
 
-      {/* Criteria rules */}
-      <div className="px-4 pt-3 flex-shrink-0">
-        <p className="text-xs text-muted mb-2">
-          Criteria — {result.rules_met}/{result.rules_total} rules met (need {result.min_required})
-        </p>
-        <div className="space-y-1">
-          {result.details.map((r) => (
-            <div key={r.id} className="flex items-center gap-2 text-xs">
-              <span className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0", r.passed ? "bg-green" : "bg-red")} />
-              <span className={r.passed ? "text-white/80" : "text-muted"}>{r.description}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Tab switcher */}
       <div className="px-4 pt-3 flex-shrink-0">
         <div className="flex gap-1 bg-card2 rounded-lg p-0.5">
@@ -192,19 +178,15 @@ export default function StockDetailPanel({ stock, onClose, onAddToPortfolio }: P
         </div>
       ) : rightTab === "analysis" ? (
         <div className="px-4 pt-3 pb-4 flex-shrink-0 space-y-3">
-          {analysisLoading ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-muted animate-pulse">Analyzing {stock.symbol}...</div>
-          ) : analysis?.analysis_text ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-white/80 leading-relaxed space-y-1">
-              {analysis.analysis_text.split("\n").filter(Boolean).map((line: string, i: number) => (
-                <p key={i} className={line.startsWith("-") ? "pl-2 text-white/60" : "text-white/80"}>{line}</p>
-              ))}
-            </div>
-          ) : analysisError ? (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-red/80">{analysisError}</div>
-          ) : (
-            <div className="bg-card2 rounded-lg p-3 text-xs text-muted">Loading...</div>
-          )}
+          <AnalysisCard
+            analysis={analysis}
+            loading={analysisLoading}
+            error={analysisError}
+            action="buy"
+            fallbackCriteria={result}
+            title="AI Analysis"
+            criteriaLabel={`${action === "buy" ? "Buy" : "Watch"} criteria`}
+          />
 
           {/* Mark as purchased — only on analysis tab */}
           {!showAddForm ? (

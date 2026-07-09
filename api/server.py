@@ -204,9 +204,10 @@ def stock_metrics(symbol: str):
 # yfinance/LLM work here no longer blocks the event loop (and every other
 # in-flight request) the way an `async def` with blocking calls did.
 @app.get("/api/analyze/{symbol}")
-def analyze(symbol: str, action: str = "buy", user_id: str = Depends(get_current_user)):
+def analyze(symbol: str, action: str = "buy", gain_pct: float | None = None,
+            user_id: str = Depends(get_current_user)):
     try:
-        return analyze_stock(symbol, action, user_id=user_id)
+        return analyze_stock(symbol, action, gain_pct=gain_pct, user_id=user_id)
     except CreditsExhausted:
         raise
     except Exception as e:

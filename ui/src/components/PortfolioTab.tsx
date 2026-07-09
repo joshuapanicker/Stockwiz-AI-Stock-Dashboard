@@ -10,6 +10,7 @@ import PortfolioChart from "./PortfolioChart";
 import SymbolSearch from "./SymbolSearch";
 import PlaidConnect from "./PlaidConnect";
 import TickerLogo from "./TickerLogo";
+import AnalysisCard from "./AnalysisCard";
 import { useAnalysis, useUniverseSignals, useSoldPositions } from "../hooks/useApi";
 import { usePersistedNumber, makeDragger } from "../hooks/usePersistedNumber";
 import type { HoldingWithMetrics } from "../types";
@@ -93,7 +94,10 @@ function HoldingRow({
   const [sellPrice, setSellPrice] = useState(h.current_price?.toFixed(2) ?? "");
   const [sellDate, setSellDate] = useState(new Date().toISOString().slice(0, 10));
   const [selling, setSelling] = useState(false);
-  const { data: analysis, loading: analysisLoading } = useAnalysis(expanded ? h.symbol : null, "sell");
+  // Pass the position's gain so the AI evaluates the exact same rule set as
+  // the sell-signal checklist (including "gained more than X%" rules)
+  const { data: analysis, loading: analysisLoading, error: analysisError } =
+    useAnalysis(expanded ? h.symbol : null, "sell", h.gain_pct);
   const sellResult = h.sell_result;
   const shouldSell = sellResult?.passed ?? false;
   const gainUp = (h.gain_pct ?? 0) >= 0;
@@ -220,33 +224,13 @@ function HoldingRow({
               </div>
             ))}
           </div>
-          {sellResult && (
-            <div className="bg-white/[0.02] rounded-xl p-4 border border-border/30">
-              <p className="text-xs text-muted mb-2">Sell conditions — {sellResult.rules_met}/{sellResult.rules_total} triggered (need {sellResult.min_required})</p>
-              <div className="space-y-1.5">
-                {sellResult.details.map(r => (
-                  <div key={r.id} className="flex items-center gap-2 text-xs">
-                    <span className={clsx("w-1.5 h-1.5 rounded-full flex-shrink-0", r.passed ? "bg-red" : "bg-white/15")} />
-                    <span className={r.passed ? "text-red/90" : "text-muted"}>{r.description}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <div>
-            <p className="text-xs text-muted mb-2">AI Sell Analysis</p>
-            {analysisLoading ? (
-              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-muted animate-pulse border border-border/30">Analyzing...</div>
-            ) : analysis?.analysis_text ? (
-              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-white leading-relaxed space-y-1 border border-border/30">
-                {analysis.analysis_text.split("\n").filter(Boolean).map((line: string, i: number) => (
-                  <p key={i} className={line.startsWith("-") ? "pl-2 text-white/70" : ""}>{line}</p>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white/[0.02] rounded-xl p-4 text-xs text-muted border border-border/30">Expand to load analysis</div>
-            )}
-          </div>
+          <AnalysisCard
+            analysis={analysis}
+            loading={analysisLoading}
+            error={analysisError}
+            action="sell"
+            fallbackCriteria={sellResult}
+          />
         </div>
       )}
     </div>

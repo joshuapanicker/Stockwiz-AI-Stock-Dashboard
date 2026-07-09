@@ -181,7 +181,7 @@ export function usePortfolio() {
   return { data, loading, refresh: load, addHolding, removeHolding, removeHoldings, sellHolding, addError };
 }
 
-export function useAnalysis(symbol: string | null, action: string | null) {
+export function useAnalysis(symbol: string | null, action: string | null, gainPct?: number | null) {
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -189,14 +189,17 @@ export function useAnalysis(symbol: string | null, action: string | null) {
 
   useEffect(() => {
     if (!symbol || !action) return;
-    const key = `${symbol}:${action}`;
+    const key = `${symbol}:${action}:${gainPct ?? ""}`;
     if (prevRef.current === key) return;
     prevRef.current = key;
     setLoading(true);
     setData(null);
     setError(null);
+    // gain_pct lets the backend evaluate position-dependent rules (e.g.
+    // "gained more than 40%") identically to the portfolio sell signals
+    const gainParam = gainPct != null ? `&gain_pct=${gainPct}` : "";
     const timer = setTimeout(() => {
-      apiFetch<any>(`/analyze/${symbol}?action=${action}`)
+      apiFetch<any>(`/analyze/${symbol}?action=${action}${gainParam}`)
         .then(d => { setData(d); setLoading(false); })
         .catch(e => { setError(e.message); setLoading(false); });
     }, 300);
@@ -205,7 +208,7 @@ export function useAnalysis(symbol: string | null, action: string | null) {
       // Reset so re-entry always fetches
       prevRef.current = "";
     };
-  }, [symbol, action]);
+  }, [symbol, action, gainPct]);
 
   return { data, error, loading };
 }

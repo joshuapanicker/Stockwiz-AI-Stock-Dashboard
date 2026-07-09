@@ -11,7 +11,7 @@ from core.news import build_news_context
 
 
 def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict,
-                  market: dict, news_ctx: str = "") -> str:
+                  market: dict, news_ctx: str = "", gain_pct: float | None = None) -> str:
     data = {k: metrics.get(k) for k in [
         "symbol", "date", "close_price", "low_52_week", "high_52_week",
         "trailing_pe", "forward_pe", "revenue_growth", "earnings_growth",
@@ -19,6 +19,8 @@ def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict
     ]}
     data["market_trend"] = market.get("market_trend")
     data["vix"] = market.get("vix")
+    if gain_pct is not None:
+        data["position_gain_pct"] = round(gain_pct, 4)
 
     rules = "\n".join(
         f"  {'[PASS]' if r['passed'] else '[FAIL]'} {r['description']}"
@@ -56,7 +58,9 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
                   user_id: str | None = None) -> dict:
     from concurrent.futures import ThreadPoolExecutor
     from core.cache import get as cache_get, set as cache_set
-    cache_key = f"analysis:{symbol}:{action}:{gain_pct}"
+    # user_id is part of the key: criteria are per-user, so cached analyses
+    # must never leak across accounts with different rule sets.
+    cache_key = f"analysis:{symbol}:{action}:{gain_pct}:{user_id}"
     cached = cache_get(cache_key, 300)  # cache for 5 min
     if cached:
         return cached
@@ -73,11 +77,15 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
             news_ctx = f_news.result()
         except Exception:
             news_ctx = ""
-    criteria_result = evaluate_criteria(action, metrics, market, gain_pct=gain_pct)
+    # Same gain_pct + user criteria as the portfolio sell-signal checklist,
+    # so the AI's rule counts always match what the UI displays.
+    criteria_result = evaluate_criteria(action, metrics, market,
+                                        gain_pct=gain_pct, user_id=user_id)
 
     from core.credits import metered_create
 
-    prompt = _build_prompt(symbol, action, criteria_result, metrics, market, news_ctx)
+    prompt = _build_prompt(symbol, action, criteria_result, metrics, market, news_ctx,
+                           gain_pct=gain_pct)
     message = metered_create(
         user_id,
         model="claude-haiku-4-5-20251001",
