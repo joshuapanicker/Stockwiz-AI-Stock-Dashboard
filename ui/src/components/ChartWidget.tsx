@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeftRight, ChevronDown, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, X } from "lucide-react";
 
 import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
@@ -129,7 +129,7 @@ export default function ChartWidget({
         <div className="flex items-center gap-2 min-w-0">
           {label && <span className="text-xs text-muted truncate">{label}</span>}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {extra}
           {/* Swap button */}
           <button
@@ -143,6 +143,15 @@ export default function ChartWidget({
             <span className="hidden sm:inline">{currentOption.label}</span>
             <ChevronDown size={8} className={clsx("transition-transform", menuOpen && "rotate-180")} />
           </button>
+          {/* Remove — standalone, always visible in the top-right corner */}
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              title="Remove widget"
+              className="flex items-center justify-center w-5 h-5 rounded-lg text-muted hover:text-red hover:bg-red/10 transition-colors">
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         {/* Dropdown */}
@@ -161,14 +170,6 @@ export default function ChartWidget({
                 {chartType === opt.value && <span className="text-green text-[10px] mt-0.5">✓</span>}
               </button>
             ))}
-            {onRemove && (
-              <button
-                onClick={() => { setMenuOpen(false); onRemove(); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left text-muted hover:text-red hover:bg-red/5 transition-colors border-t border-border/50 mt-1">
-                <Trash2 size={11} />
-                <span className="text-xs font-medium">Remove widget</span>
-              </button>
-            )}
           </div>
         )}
       </div>

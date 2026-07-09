@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import clsx from "clsx";
-import { Briefcase, MessageSquare, BarChart2, User, Plus } from "lucide-react";
+import { Briefcase, MessageSquare, BarChart2, User, Plus, GripVertical } from "lucide-react";
 
 import ChartWidget, { type ChartType } from "./components/ChartWidget";
 import UniverseTable from "./components/UniverseTable";
@@ -108,6 +108,18 @@ export default function App() {
     return [...prev, { key: `slot_${Date.now()}`, defaultType: "candlestick" as ChartType }];
   });
 
+  // Drag-to-reorder — only the chart widget grid supports this. Dragging is
+  // initiated from a dedicated grip handle (not the whole card) so it never
+  // fights with the chart libraries' own click/drag interactions.
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const reorderSlots = (from: number, to: number) => setSlots(prev => {
+    const next = [...prev];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  });
+
   function openSettings(tab: SettingsTab = "criteria") {
     setSettingsTab(tab);
     setSettingsOpen(true);
@@ -160,24 +172,58 @@ export default function App() {
 
   const row2H = Math.max(110, Math.round(chartH * 0.79));
 
-  const renderSlot = (slot: SlotDef, rowIdx: number) => (
-    <div key={slot.key}
-      className="chart-card glass-card bg-card/60 rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up flex-1"
-      style={{ flexBasis: "calc(50% - 4px)" }}>
-      <ChartWidget
-        slotKey={slot.key}
-        defaultType={slot.defaultType}
-        history={featuredHistory}
-        history6m={featuredHistory6m}
-        symbol={activeSymbol}
-        currentPrice={selectedStock?.metrics?.close_price ?? null}
-        height={rowIdx === 0 ? chartH : row2H}
-        label={rowIdx === 0 ? (activeSymbol ?? "—") : undefined}
-        loadingSkeleton={screenLoading && !featuredHistory.length}
-        onRemove={() => removeSlot(slot.key)}
-      />
-    </div>
-  );
+  const renderSlot = (slot: SlotDef, rowIdx: number, flatIdx: number) => {
+    const isDragging = draggedIdx === flatIdx;
+    const isDragOver = dragOverIdx === flatIdx && draggedIdx !== null && draggedIdx !== flatIdx;
+    return (
+      <div key={slot.key}
+        onDragOver={e => { e.preventDefault(); if (draggedIdx !== null) setDragOverIdx(flatIdx); }}
+        onDrop={e => {
+          e.preventDefault();
+          if (draggedIdx !== null && draggedIdx !== flatIdx) reorderSlots(draggedIdx, flatIdx);
+          setDraggedIdx(null);
+          setDragOverIdx(null);
+        }}
+        className={clsx(
+          "chart-card glass-card bg-card/60 rounded-2xl p-4 border min-w-0 overflow-hidden anim-fade-up flex-1 transition-colors",
+          isDragging ? "opacity-40 border-border/50" : isDragOver ? "border-green/50 ring-2 ring-green/30" : "border-border/50"
+        )}
+        style={{ flexBasis: "calc(50% - 4px)" }}>
+        <ChartWidget
+          slotKey={slot.key}
+          defaultType={slot.defaultType}
+          history={featuredHistory}
+          history6m={featuredHistory6m}
+          symbol={activeSymbol}
+          currentPrice={selectedStock?.metrics?.close_price ?? null}
+          height={rowIdx === 0 ? chartH : row2H}
+          label={rowIdx === 0 ? (activeSymbol ?? "—") : undefined}
+          loadingSkeleton={screenLoading && !featuredHistory.length}
+          onRemove={() => removeSlot(slot.key)}
+          extra={
+            <button
+              draggable
+              onDragStart={e => {
+                setDraggedIdx(flatIdx);
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(flatIdx));
+                // Drag the whole card, not just this small handle
+                const card = (e.currentTarget as HTMLElement).closest(".chart-card") as HTMLElement | null;
+                if (card) {
+                  const rect = card.getBoundingClientRect();
+                  e.dataTransfer.setDragImage(card, e.clientX - rect.left, e.clientY - rect.top);
+                }
+              }}
+              onDragEnd={() => { setDraggedIdx(null); setDragOverIdx(null); }}
+              title="Drag to reorder"
+              className="cursor-grab active:cursor-grabbing text-muted hover:text-white p-0.5 rounded transition-colors flex-shrink-0">
+              <GripVertical size={12} />
+            </button>
+          }
+        />
+      </div>
+    );
+  };
 
   // Chunk slots into rows of two — layout grows/shrinks with the slot list
   const slotRows: SlotDef[][] = [];
@@ -255,7 +301,7 @@ export default function App() {
                 {/* Chart rows — two widgets per row, as many rows as needed */}
                 {slotRows.map((row, rowIdx) => (
                   <div key={rowIdx} className="flex gap-2 flex-shrink-0 min-w-0 stagger">
-                    {row.map(slot => renderSlot(slot, rowIdx))}
+                    {row.map((slot, colIdx) => renderSlot(slot, rowIdx, rowIdx * 2 + colIdx))}
                   </div>
                 ))}
 
