@@ -189,6 +189,21 @@ def row_to_metrics(row: sqlite3.Row) -> dict:
     return d
 
 
+def get_stocks_by_symbols(symbols: list[str]) -> list[dict]:
+    """Fetch cached rows for specific symbols (case-insensitive), preserving input order."""
+    if not symbols:
+        return []
+    upper = [s.upper() for s in symbols]
+    placeholders = ",".join("?" for _ in upper)
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM universe_stocks WHERE symbol IN ({placeholders}) AND fetch_error IS NULL",
+            upper,
+        ).fetchall()
+    by_symbol = {r["symbol"]: row_to_metrics(r) for r in rows}
+    return [by_symbol[s] for s in upper if s in by_symbol]
+
+
 def query_universe(
     sector: str | None = None,
     min_market_cap: float | None = None,
@@ -200,6 +215,7 @@ def query_universe(
     min_earnings_growth: float | None = None,
     max_price: float | None = None,          # share price ceiling
     min_price: float | None = None,          # share price floor
+    symbols: list[str] | None = None,        # restrict to specific tickers
     limit: int = 200,
     order_by: str = "market_cap DESC",
 ) -> list[dict]:
@@ -210,6 +226,12 @@ def query_universe(
     clauses: list[str] = ["fetch_error IS NULL", "close_price IS NOT NULL"]
     params: list[Any] = []
 
+    if symbols:
+        upper = [s.upper() for s in symbols if s and s.strip()]
+        if upper:
+            placeholders = ",".join("?" for _ in upper)
+            clauses.append(f"symbol IN ({placeholders})")
+            params.extend(upper)
     if sector:
         clauses.append("LOWER(sector) = LOWER(?)")
         params.append(sector)

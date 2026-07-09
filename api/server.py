@@ -870,6 +870,7 @@ class UniverseQueryRequest(BaseModel):
     min_market_cap: float | None = None
     max_price: float | None = None
     min_price: float | None = None
+    symbols: list[str] | None = None
     limit: int = 50
     order_by: str = "market_cap DESC"
 
@@ -889,6 +890,7 @@ def universe_query(req: UniverseQueryRequest):
         min_market_cap=req.min_market_cap,
         max_price=req.max_price,
         min_price=req.min_price,
+        symbols=req.symbols,
         limit=min(req.limit, 500),
         order_by=req.order_by,
     )

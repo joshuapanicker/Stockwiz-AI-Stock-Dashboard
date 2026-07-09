@@ -299,8 +299,64 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
   const [replyLoading, setReplyLoading] = useState(false);
   const [chatHeight, setChatHeight] = useState(200);
 
+  // Ticker autocomplete — deterministic symbol match alongside the AI search
+  const [suggestions, setSuggestions] = useState<UniverseStock[]>([]);
+  const [suggestIdx, setSuggestIdx] = useState(-1);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+
   const abortRef = useRef<AbortController | null>(null);
   const sectors = useUniverseSectors();
+
+  // Close the suggestion dropdown on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+        setSuggestions([]);
+        setSuggestIdx(-1);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // As the user types, look up ticker matches for the last word so single
+  // stocks are always reachable without going through the AI at all
+  function updateQuery(v: string) {
+    setQuery(v);
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    const token = v.trim().split(/\s+/).pop() ?? "";
+    if (!token || token.length > 6 || !/^[A-Za-z.\-]+$/.test(token)) {
+      setSuggestions([]);
+      setSuggestIdx(-1);
+      return;
+    }
+    suggestTimer.current = setTimeout(async () => {
+      try {
+        const data = await apiFetch<UniverseStock[]>(`/search?q=${encodeURIComponent(token.toUpperCase())}`);
+        setSuggestions(data.slice(0, 6));
+        setSuggestIdx(-1);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 150);
+  }
+
+  async function selectSuggestion(s: UniverseStock) {
+    setSuggestions([]);
+    setSuggestIdx(-1);
+    setQuery(s.symbol);
+    // Fetch the full cached row so the detail panel gets complete metrics
+    try {
+      const rows = await apiFetch<UniverseStock[]>("/universe/query", {
+        method: "POST",
+        body: JSON.stringify({ symbols: [s.symbol], limit: 1 }),
+      });
+      onSelect(s.symbol, rows[0] ?? s);
+    } catch {
+      onSelect(s.symbol, s);
+    }
+  }
 
   const loading = agentLoading || manualLoading;
   const displayResults = filters ? results : defaultResults;
@@ -319,6 +375,8 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
   // ── Run AI agent query ──
   const runAgent = useCallback(async (q: string, existingConvo: ChatMsg[] = []) => {
     if (!q.trim() || loading) return;
+    setSuggestions([]);
+    setSuggestIdx(-1);
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     const isFollowUp = existingConvo.length > 0;
@@ -420,7 +478,34 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
   }
 
   function handleKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); runAgent(query); }
+    if (suggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSuggestIdx(i => Math.min(i + 1, suggestions.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSuggestIdx(i => Math.max(i - 1, -1));
+        return;
+      }
+      if (e.key === "Escape") {
+        setSuggestions([]);
+        setSuggestIdx(-1);
+        return;
+      }
+      if (e.key === "Enter" && suggestIdx >= 0) {
+        e.preventDefault();
+        selectSuggestion(suggestions[suggestIdx]);
+        return;
+      }
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      setSuggestions([]);
+      setSuggestIdx(-1);
+      runAgent(query);
+    }
   }
 
   function sendReply() {
@@ -482,27 +567,52 @@ export default function UniverseTable({ selected, onSelect, onFirstLoad, onOpenC
       {/* ── Active filter bar ── */}
       <ActiveFilterBar filters={filters} query={query} onClear={clearFilters} />
 
-      {/* ── AI search input + quick prompts ── */}
+      {/* ── AI search input + ticker autocomplete + quick prompts ── */}
       <div className="px-3 pt-2 pb-1.5 flex-shrink-0 space-y-1.5">
-        <div className="flex items-center gap-1.5 bg-card2 border border-border rounded-xl px-3 py-1.5 focus-within:border-green/40 transition-colors">
-          <Bot size={11} className="text-green flex-shrink-0" />
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder='Ask AI: "profitable tech under PE 25", "stocks near 52-week low"...'
-            className="flex-1 bg-transparent text-[11px] text-white placeholder-muted focus:outline-none min-w-0"
-          />
-          {(query || hasActiveFilter) && (
-            <button onClick={clearFilters} title="Clear all filters"
-              className="text-muted hover:text-red transition-colors">
-              <X size={11} />
+        <div ref={searchBoxRef} className="relative">
+          <div className="flex items-center gap-1.5 bg-card2 border border-border rounded-xl px-3 py-1.5 focus-within:border-green/40 transition-colors">
+            <Bot size={11} className="text-green flex-shrink-0" />
+            <input
+              value={query}
+              onChange={e => updateQuery(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder='Type a ticker (SMCI) or ask AI: "profitable tech under PE 25"...'
+              className="flex-1 bg-transparent text-[11px] text-white placeholder-muted focus:outline-none min-w-0"
+            />
+            {(query || hasActiveFilter) && (
+              <button onClick={clearFilters} title="Clear all filters"
+                className="text-muted hover:text-red transition-colors">
+                <X size={11} />
+              </button>
+            )}
+            <button onClick={() => runAgent(query)} disabled={!query.trim() || loading}
+              className="text-muted hover:text-green disabled:opacity-30 transition-colors">
+              <Send size={11} />
             </button>
+          </div>
+
+          {/* Ticker suggestions — click to open the stock directly, no AI */}
+          {suggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 bg-card2 border border-border/70 rounded-xl shadow-2xl z-40 py-1 overflow-hidden anim-scale-in">
+              <p className="px-3 pt-1 pb-1.5 text-[9px] text-muted uppercase tracking-wider">Matching tickers</p>
+              {suggestions.map((s, i) => (
+                <button
+                  key={s.symbol}
+                  onClick={() => selectSuggestion(s)}
+                  className={clsx(
+                    "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors",
+                    i === suggestIdx ? "bg-green/10" : "hover:bg-white/5"
+                  )}>
+                  <TickerLogo symbol={s.symbol} size={20} />
+                  <span className="font-mono font-semibold text-white text-[11px] flex-shrink-0">{s.symbol}</span>
+                  <span className="text-muted text-[10px] truncate flex-1">{s.sector ?? ""}</span>
+                  {s.close_price != null && (
+                    <span className="font-mono text-white/70 text-[10px]">${s.close_price.toFixed(2)}</span>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
-          <button onClick={() => runAgent(query)} disabled={!query.trim() || loading}
-            className="text-muted hover:text-green disabled:opacity-30 transition-colors">
-            <Send size={11} />
-          </button>
         </div>
         <div className="flex items-center gap-1 flex-wrap">
           <span className="text-[9px] text-muted">Try:</span>
