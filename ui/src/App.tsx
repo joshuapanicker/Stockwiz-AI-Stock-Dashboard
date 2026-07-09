@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import clsx from "clsx";
-import { Briefcase, MessageSquare, BarChart2, User, Eye } from "lucide-react";
+import { Briefcase, MessageSquare, BarChart2, User, Plus } from "lucide-react";
 
 import ChartWidget, { type ChartType } from "./components/ChartWidget";
 import UniverseTable from "./components/UniverseTable";
@@ -58,13 +58,32 @@ function NavBar({ tab, setTab, settingsOpen, onCloseSettings }: {
   );
 }
 
-// The four dashboard chart slots — users can hide any of them and restore later
-const CHART_SLOTS: { key: string; defaultType: ChartType; row: 0 | 1 }[] = [
-  { key: "slot1", defaultType: "candlestick", row: 0 },
-  { key: "slot2", defaultType: "area", row: 0 },
-  { key: "slot3", defaultType: "roi", row: 1 },
-  { key: "slot4", defaultType: "volume_profile", row: 1 },
+// Dashboard chart slots — a fully dynamic list: users can remove any widget
+// and add new ones (each freely switchable to any chart type)
+interface SlotDef { key: string; defaultType: ChartType }
+
+const DEFAULT_SLOTS: SlotDef[] = [
+  { key: "slot1", defaultType: "candlestick" },
+  { key: "slot2", defaultType: "area" },
+  { key: "slot3", defaultType: "roi" },
+  { key: "slot4", defaultType: "volume_profile" },
 ];
+const MAX_SLOTS = 8;
+
+function loadSlots(): SlotDef[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem("pulse_chart_slots") ?? "null");
+    if (Array.isArray(saved) && saved.every((s: any) => typeof s?.key === "string" && s?.defaultType)) {
+      return saved;
+    }
+  } catch {}
+  // Migrate from the old fixed-4-slot hide/show system
+  try {
+    const hidden: string[] = JSON.parse(localStorage.getItem("pulse_hidden_widgets") ?? "[]");
+    return DEFAULT_SLOTS.filter(s => !hidden.includes(s.key));
+  } catch {}
+  return DEFAULT_SLOTS;
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("analysis");
@@ -77,17 +96,17 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("criteria");
 
-  // Hidden chart widgets — persisted so the dashboard layout is user-owned
-  const [hiddenSlots, setHiddenSlots] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem("pulse_hidden_widgets") ?? "[]"); }
-    catch { return []; }
-  });
+  // Chart widget slots — persisted so the dashboard layout is user-owned
+  const [slots, setSlots] = useState<SlotDef[]>(loadSlots);
   useEffect(() => {
-    try { localStorage.setItem("pulse_hidden_widgets", JSON.stringify(hiddenSlots)); } catch {}
-  }, [hiddenSlots]);
+    try { localStorage.setItem("pulse_chart_slots", JSON.stringify(slots)); } catch {}
+  }, [slots]);
 
-  const hideSlot = (key: string) => setHiddenSlots(prev => [...prev, key]);
-  const showSlot = (key: string) => setHiddenSlots(prev => prev.filter(k => k !== key));
+  const removeSlot = (key: string) => setSlots(prev => prev.filter(s => s.key !== key));
+  const addSlot = () => setSlots(prev => {
+    if (prev.length >= MAX_SLOTS) return prev;
+    return [...prev, { key: `slot_${Date.now()}`, defaultType: "candlestick" as ChartType }];
+  });
 
   function openSettings(tab: SettingsTab = "criteria") {
     setSettingsTab(tab);
@@ -141,7 +160,7 @@ export default function App() {
 
   const row2H = Math.max(110, Math.round(chartH * 0.79));
 
-  const renderSlot = (slot: { key: string; defaultType: ChartType; row: 0 | 1 }) => (
+  const renderSlot = (slot: SlotDef, rowIdx: number) => (
     <div key={slot.key}
       className="chart-card glass-card bg-card/60 rounded-2xl p-4 border border-border/50 min-w-0 overflow-hidden anim-fade-up flex-1"
       style={{ flexBasis: "calc(50% - 4px)" }}>
@@ -152,16 +171,17 @@ export default function App() {
         history6m={featuredHistory6m}
         symbol={activeSymbol}
         currentPrice={selectedStock?.metrics?.close_price ?? null}
-        height={slot.row === 0 ? chartH : row2H}
-        label={slot.row === 0 ? (activeSymbol ?? "—") : undefined}
+        height={rowIdx === 0 ? chartH : row2H}
+        label={rowIdx === 0 ? (activeSymbol ?? "—") : undefined}
         loadingSkeleton={screenLoading && !featuredHistory.length}
-        onHide={() => hideSlot(slot.key)}
+        onRemove={() => removeSlot(slot.key)}
       />
     </div>
   );
 
-  const visibleRow0 = CHART_SLOTS.filter(s => s.row === 0 && !hiddenSlots.includes(s.key));
-  const visibleRow1 = CHART_SLOTS.filter(s => s.row === 1 && !hiddenSlots.includes(s.key));
+  // Chunk slots into rows of two — layout grows/shrinks with the slot list
+  const slotRows: SlotDef[][] = [];
+  for (let i = 0; i < slots.length; i += 2) slotRows.push(slots.slice(i, i + 2));
 
   return (
     <div className="h-screen bg-bg text-white font-sans flex flex-col overflow-hidden">
@@ -217,17 +237,13 @@ export default function App() {
               <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                 <MarketBar market={market} />
               </div>
-              {hiddenSlots.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {hiddenSlots.map(key => (
-                    <button key={key} onClick={() => showSlot(key)}
-                      title="Show widget"
-                      className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-white/5 border border-border/60 text-muted hover:text-green hover:border-green/30 transition-colors">
-                      <Eye size={9} />
-                      {key.replace("slot", "Chart ")}
-                    </button>
-                  ))}
-                </div>
+              {slots.length < MAX_SLOTS && (
+                <button onClick={addSlot}
+                  title="Add a chart widget"
+                  className="flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full bg-white/5 border border-border/60 text-muted hover:text-green hover:border-green/30 transition-colors flex-shrink-0">
+                  <Plus size={10} />
+                  Add chart
+                </button>
               )}
             </div>
 
@@ -236,22 +252,15 @@ export default function App() {
 
               {/* Left: charts + table */}
               <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2 pr-1 overflow-hidden">
-                {/* Charts row 1 */}
-                {visibleRow0.length > 0 && (
-                  <div className="flex gap-2 flex-shrink-0 min-w-0 stagger">
-                    {visibleRow0.map(renderSlot)}
+                {/* Chart rows — two widgets per row, as many rows as needed */}
+                {slotRows.map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex gap-2 flex-shrink-0 min-w-0 stagger">
+                    {row.map(slot => renderSlot(slot, rowIdx))}
                   </div>
-                )}
-
-                {/* Charts row 2 */}
-                {visibleRow1.length > 0 && (
-                  <div className="flex gap-2 flex-shrink-0 min-w-0 stagger">
-                    {visibleRow1.map(renderSlot)}
-                  </div>
-                )}
+                ))}
 
                 {/* Chart-height drag handle */}
-                {(visibleRow0.length > 0 || visibleRow1.length > 0) && (
+                {slots.length > 0 && (
                   <div onMouseDown={onChartHDivider}
                     title="Drag to resize charts"
                     className="divider-handle h-2 flex-shrink-0 cursor-row-resize flex items-center justify-center">

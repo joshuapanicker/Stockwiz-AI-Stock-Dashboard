@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import clsx from "clsx";
-import { ArrowLeftRight, ChevronDown, EyeOff } from "lucide-react";
+import { ArrowLeftRight, ChevronDown, Trash2 } from "lucide-react";
 
 import CandlestickChart from "./CandlestickChart";
 import AreaChart from "./AreaChart";
@@ -91,12 +91,12 @@ interface Props {
   label?: string;
   extra?: React.ReactNode;  // extra content in the header (e.g. period selector)
   loadingSkeleton?: boolean;
-  onHide?: () => void;      // when provided, the menu offers "Hide widget"
+  onRemove?: () => void;    // when provided, the menu offers "Remove widget"
 }
 
 export default function ChartWidget({
   slotKey, defaultType, history, history6m, symbol,
-  currentPrice, height, label, extra, loadingSkeleton, onHide,
+  currentPrice, height, label, extra, loadingSkeleton, onRemove,
 }: Props) {
   const storageKey = `chart_widget_${slotKey}`;
   const [chartType, setChartType] = useState<ChartType>(() => {
@@ -161,12 +161,12 @@ export default function ChartWidget({
                 {chartType === opt.value && <span className="text-green text-[10px] mt-0.5">✓</span>}
               </button>
             ))}
-            {onHide && (
+            {onRemove && (
               <button
-                onClick={() => { setMenuOpen(false); onHide(); }}
+                onClick={() => { setMenuOpen(false); onRemove(); }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left text-muted hover:text-red hover:bg-red/5 transition-colors border-t border-border/50 mt-1">
-                <EyeOff size={11} />
-                <span className="text-xs font-medium">Hide widget</span>
+                <Trash2 size={11} />
+                <span className="text-xs font-medium">Remove widget</span>
               </button>
             )}
           </div>
