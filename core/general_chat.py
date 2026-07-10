@@ -134,18 +134,30 @@ def build_system(messages: list[dict]) -> str:
         market_ctx = "Market data unavailable."
 
     stock_ctx = ""
+    filing_ctx = ""
     last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
     tickers = _extract_tickers(last_user.upper())
     if tickers:
         summaries = [_stock_summary(t) for t in tickers]
         stock_ctx = "\n\nLive stock data:\n" + "\n".join(summaries)
+        # RAG grounding: excerpts from the mentioned tickers' SEC filings,
+        # retrieved against the user's own message. Non-blocking — a ticker
+        # that isn't indexed yet is warmed in the background for the next
+        # message instead of stalling this reply.
+        try:
+            from core.rag_index import build_chat_filing_context
+            filing_ctx = build_chat_filing_context(tickers, last_user)
+        except Exception:
+            filing_ctx = ""
 
     return (
         "You are a knowledgeable financial analyst assistant in a stock trading dashboard.\n"
-        "You have access to live market data and recent news fetched from Yahoo Finance — use it directly.\n"
+        "You have access to live market data, recent news, and excerpts from companies' "
+        "SEC filings — use them directly and cite the filing when you draw on one.\n"
         "Never say you don't have access to real-time data. The data is provided below.\n"
         "Be direct, data-driven, and concise. Do not use markdown formatting like ** or *.\n"
         "Write in plain text only. Keep responses under 200 words unless asked for more.\n\n"
         f"Live market context: {market_ctx}"
         f"{stock_ctx}"
+        f"{filing_ctx}"
     )

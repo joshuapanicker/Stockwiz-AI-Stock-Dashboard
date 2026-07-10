@@ -122,12 +122,15 @@ def _build_retrieval_query(symbol: str, action: str, criteria_result: dict) -> s
     return ", ".join(topics[:3])
 
 
-def _get_filing_context(symbol: str, query: str) -> str:
+def _get_filing_context(symbol: str, query: str) -> tuple[str, list[dict]]:
+    """Returns (prompt_block, sources). sources is a deduped list of
+    {form, date, section} — surfaced in the API response so the UI can show
+    users exactly which filings a verdict was grounded in."""
     try:
-        from core.rag_index import build_filing_context
-        return build_filing_context(symbol, query=query)
+        from core.rag_index import build_filing_context_with_sources
+        return build_filing_context_with_sources(symbol, query=query)
     except Exception:
-        return ""
+        return "", []
 
 
 def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
@@ -166,7 +169,7 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
     # (triggered rules for a sell, failing rules for a buy) — the index is
     # already warm from the parallel block above, so this lookup is fast.
     retrieval_query = _build_retrieval_query(symbol, action, criteria_result)
-    filing_ctx = _get_filing_context(symbol, retrieval_query)
+    filing_ctx, filing_sources = _get_filing_context(symbol, retrieval_query)
 
     from core.credits import metered_create
 
@@ -201,6 +204,7 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
         "market": market,
         "criteria_result": criteria_result,
         "analysis_text": analysis_text,
+        "grounding_sources": filing_sources,
     }
 
     # Log the verdict for the public track record — best-effort, must never

@@ -140,13 +140,28 @@ def build_system(symbol: str, messages: list[dict], user_id: str | None = None) 
     """Return the system prompt with live stock context for streaming."""
     stock_ctx = _stock_context(symbol)
     profile_ctx = _profile_context(user_id)
+
+    # RAG grounding: filing excerpts retrieved against the user's question.
+    # Non-blocking — a cold ticker indexes in the background rather than
+    # delaying the first token of the streamed reply.
+    filing_ctx = ""
+    try:
+        from core.rag_index import build_chat_filing_context
+        last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        if last_user:
+            filing_ctx = build_chat_filing_context([symbol], last_user)
+    except Exception:
+        filing_ctx = ""
+
     return (
         f"You are a sharp, concise stock analysis assistant in a trading dashboard.\n"
-        f"You have live data for {symbol} below. Use the exact numbers provided.\n"
+        f"You have live data for {symbol} below. Use the exact numbers provided, and "
+        f"cite the SEC filing when you draw on a filing excerpt.\n"
         f"Never say you cannot access data. Be direct and data-driven.\n"
         f"When explaining criteria, describe conditions in plain English.\n"
         f"Do not use markdown formatting like ** or *. Write in plain text only.\n"
         f"Keep responses under 150 words unless the user asks for more detail.\n"
         f"{profile_ctx}\n\n"
         f"Live data for {symbol}:\n{stock_ctx}"
+        f"{filing_ctx}"
     )

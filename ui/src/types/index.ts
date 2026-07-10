@@ -95,6 +95,12 @@ export interface SoldPosition {
   created_at: string;
 }
 
+export interface GroundingSource {
+  form: string;     // "10-K" | "10-Q"
+  date: string;     // filing date
+  section: string;  // "Risk Factors" | "MD&A"
+}
+
 export interface AnalysisResult {
   symbol: string;
   action: string;
@@ -102,6 +108,7 @@ export interface AnalysisResult {
   market: MarketContext;
   criteria_result: CriteriaResult;
   analysis_text: string;
+  grounding_sources?: GroundingSource[];
 }
 
 // ── Universe types ─────────────────────────────────────────────────────────

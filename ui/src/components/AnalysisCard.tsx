@@ -7,7 +7,7 @@
  * text (Decision / Summary / Reasoning) instead of dumping it raw.
  */
 import clsx from "clsx";
-import { Sparkles, Check, X, RefreshCw, AlertCircle } from "lucide-react";
+import { Sparkles, Check, X, RefreshCw, AlertCircle, FileText } from "lucide-react";
 
 interface CriteriaDetail {
   id: string;
@@ -173,6 +173,21 @@ export default function AnalysisCard({ analysis, loading, error, action, fallbac
               <p className="text-xs text-white/70 leading-relaxed whitespace-pre-line">
                 {analysis.analysis_text}
               </p>
+            )}
+
+            {/* RAG grounding sources — which SEC filings informed this verdict */}
+            {analysis?.grounding_sources?.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-2.5 border-t border-border/20">
+                <FileText size={10} className="text-muted flex-shrink-0" />
+                <span className="text-[10px] text-muted">Grounded in</span>
+                {analysis.grounding_sources.map((s: any, i: number) => (
+                  <span key={i}
+                    title={`${s.form} filed ${s.date} — ${s.section}`}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-border/40 text-white/60 whitespace-nowrap">
+                    {s.form} · {s.section} · {s.date}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         ) : (
