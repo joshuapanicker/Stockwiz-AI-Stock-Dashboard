@@ -93,6 +93,16 @@ async def prewarm():
         await asyncio.gather(*[asyncio.to_thread(warm, s) for s in symbols])
         # Start universe background fetcher in a thread
         start_background_fetcher()
+        # RAG: load the embedding model off the request path, then queue
+        # background filing indexing for the top watchlist tickers (jobs
+        # serialize through the index gate — one at a time, low priority).
+        try:
+            from core.rag_index import preload_embedder, ensure_indexed_async
+            await asyncio.to_thread(preload_embedder)
+            for s in symbols:
+                ensure_indexed_async(s)
+        except Exception:
+            pass
 
     asyncio.create_task(run())
 

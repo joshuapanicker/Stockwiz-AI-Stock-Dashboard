@@ -6,6 +6,15 @@ numeric fundamentals.
 
 Uses a small CPU-friendly embedding model (no GPU required) and a local
 persistent Chroma store — no external service, no per-query cost.
+
+Performance contract (learned the hard way on Railway's small shared CPU):
+  - NOTHING here may block a user-facing request. Indexing (SEC fetch +
+    embedding) always happens on a background thread; request paths only
+    read an already-built index or return empty context.
+  - Only ONE indexing job runs at a time (_index_gate) so background
+    embedding can't peg the whole container and starve API requests.
+  - RAG_DISABLED=1 is a kill switch: skips the heavy imports entirely and
+    every entry point returns empty — instant rollback to pre-RAG behavior.
 """
 
 from __future__ import annotations
@@ -16,31 +25,69 @@ import threading
 import time
 from pathlib import Path
 
-import chromadb
-from sentence_transformers import SentenceTransformer
-
-from core.filings import fetch_filing_sections
-
 # On hosted deploys, point RAG_DB_PATH at a persistent volume so the index
 # survives redeploys — same convention as UNIVERSE_DB_PATH.
 DB_PATH = Path(os.getenv("RAG_DB_PATH") or (Path(__file__).parent.parent / "data" / "rag_chroma"))
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-_STATE_FILE = Path(__file__).parent.parent / "data" / "rag_index_state.json"
+# Lives NEXT TO the index (i.e. on the same persistent volume in prod) —
+# if this tracked the repo dir instead, every deploy would wipe the
+# "what's indexed" bookkeeping and force re-indexing everything.
+_STATE_FILE = DB_PATH.parent / "rag_index_state.json"
+
+# Persist the HuggingFace model cache next to the index too, so the ~130MB
+# embedding model isn't re-downloaded on every deploy. Must be set before
+# sentence_transformers is imported.
+os.environ.setdefault("HF_HOME", str(DB_PATH.parent / "hf_cache"))
+# Chroma phones telemetry home by default — no thanks.
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+
+_DISABLED = os.getenv("RAG_DISABLED") == "1"
+
+if not _DISABLED:
+    import chromadb
+    from sentence_transformers import SentenceTransformer
+
+    from core.filings import fetch_filing_sections
 
 # Filings update quarterly — no need to re-fetch/re-embed more often than this.
 REINDEX_TTL = 25 * 86_400
 
-_embedder: SentenceTransformer | None = None
+# Bound the embedding cost per filing section. Risk Factors sections can run
+# 60k+ chars (~40 chunks); the tail chunks add little retrieval value but a
+# lot of CPU time on a small host.
+MAX_CHUNKS_PER_SECTION = int(os.getenv("RAG_MAX_CHUNKS_PER_SECTION", "20"))
+
+_embedder = None
 _client = None
 _collection = None
+_embedder_lock = threading.Lock()
 
 
-def _get_embedder() -> SentenceTransformer:
+def _get_embedder():
     global _embedder
-    if _embedder is None:
-        _embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
-    return _embedder
+    with _embedder_lock:
+        if _embedder is None:
+            # Keep torch from spawning a thread per visible core — on a small
+            # shared host that thrashes and starves concurrent API requests.
+            try:
+                import torch
+                torch.set_num_threads(max(1, min(4, (os.cpu_count() or 2) // 2)))
+            except Exception:
+                pass
+            _embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
+        return _embedder
+
+
+def preload_embedder() -> None:
+    """Load the embedding model off the request path (server startup).
+    First call after a fresh volume also downloads it to the HF cache."""
+    if _DISABLED:
+        return
+    try:
+        _get_embedder()
+    except Exception:
+        pass
 
 
 def _get_collection():
@@ -86,17 +133,25 @@ def _save_state(state: dict) -> None:
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
 
+# Serialize indexing globally: one embed job at a time. Background threads
+# for other tickers simply wait their turn instead of collectively pegging
+# the CPU while user requests are in flight.
+_index_gate = threading.Semaphore(1)
+
 
 def index_ticker(symbol: str) -> int:
     """Fetch, chunk, and embed this ticker's latest filing sections.
     Returns the number of chunks indexed."""
+    if _DISABLED:
+        return 0
     symbol = symbol.strip().upper()
     with _inflight_lock:
         if symbol in _inflight:
             return 0  # someone else is already indexing this ticker
         _inflight.add(symbol)
     try:
-        return _index_ticker_inner(symbol)
+        with _index_gate:
+            return _index_ticker_inner(symbol)
     finally:
         with _inflight_lock:
             _inflight.discard(symbol)
@@ -117,19 +172,24 @@ def _index_ticker_inner(symbol: str) -> int:
     if sections:
         embedder = _get_embedder()
         for sec in sections:
-            chunks = _chunk_text(sec["text"])
-            for i, chunk in enumerate(chunks):
-                embedding = embedder.encode(chunk).tolist()
-                collection.add(
-                    embeddings=[embedding],
-                    documents=[chunk],
-                    metadatas=[{
-                        "ticker": symbol, "form": sec["form"],
-                        "section": sec["section"], "date": sec["date"],
-                    }],
-                    ids=[f"{symbol}-{sec['form']}-{sec['section']}-{i}"],
-                )
-                count += 1
+            chunks = _chunk_text(sec["text"])[:MAX_CHUNKS_PER_SECTION]
+            if not chunks:
+                continue
+            # One batched encode per section — dramatically faster than
+            # embedding chunk-by-chunk.
+            embeddings = embedder.encode(chunks, batch_size=16,
+                                         show_progress_bar=False).tolist()
+            collection.add(
+                embeddings=embeddings,
+                documents=chunks,
+                metadatas=[{
+                    "ticker": symbol, "form": sec["form"],
+                    "section": sec["section"], "date": sec["date"],
+                } for _ in chunks],
+                ids=[f"{symbol}-{sec['form']}-{sec['section']}-{i}"
+                     for i in range(len(chunks))],
+            )
+            count += len(chunks)
 
     state = _load_state()
     state[symbol] = time.time()
@@ -139,15 +199,16 @@ def _index_ticker_inner(symbol: str) -> int:
 
 def is_indexed(symbol: str) -> bool:
     """True if this ticker has a reasonably fresh index."""
+    if _DISABLED:
+        return False
     last = _load_state().get(symbol.strip().upper())
     return bool(last and (time.time() - last) < REINDEX_TTL)
 
 
 def ensure_indexed(symbol: str) -> None:
-    """Lazily (re-)index a ticker if it's never been indexed or is stale.
-    Runs synchronously — the first analysis of a new ticker pays this cost
-    once (SEC fetch + embedding), then it's skipped for REINDEX_TTL."""
-    if is_indexed(symbol):
+    """(Re-)index a ticker if it's never been indexed or is stale.
+    Blocking — only call from background threads, never a request path."""
+    if _DISABLED or is_indexed(symbol):
         return
     try:
         index_ticker(symbol.strip().upper())
@@ -156,10 +217,10 @@ def ensure_indexed(symbol: str) -> None:
 
 
 def ensure_indexed_async(symbol: str) -> None:
-    """Fire-and-forget indexing for latency-sensitive callers (chat): a cold
-    ticker gets indexed in the background so the NEXT message about it is
-    grounded, instead of stalling the current reply for several seconds."""
-    if is_indexed(symbol):
+    """Fire-and-forget indexing: a cold ticker gets indexed in the
+    background so the NEXT analysis/chat about it is grounded, instead of
+    stalling the current one for seconds of SEC fetching + embedding."""
+    if _DISABLED or is_indexed(symbol):
         return
     threading.Thread(target=ensure_indexed, args=(symbol,), daemon=True).start()
 
@@ -173,6 +234,8 @@ def retrieve_context(symbol: str, query: str, k: int = 3) -> list[dict]:
     caps each section at 2 chunks, and guarantees at least one MD&A chunk
     when one is available.
     """
+    if _DISABLED:
+        return []
     try:
         collection = _get_collection()
         embedder = _get_embedder()
@@ -217,9 +280,16 @@ def build_filing_context_with_sources(symbol: str, query: str | None = None) -> 
     Grounding block for the analysis prompt: labeled excerpts from the
     ticker's most recent 10-K/10-Q, plus a deduplicated source list
     ({form, date, section}) suitable for showing users what a verdict was
-    grounded in. Returns ("", []) if nothing is indexed/available.
+    grounded in.
+
+    Non-blocking: a ticker that isn't indexed yet returns ("", []) and gets
+    indexed in the background — its first analysis is ungrounded but fast,
+    the next one is grounded. (Blocking here used to hang analyses for the
+    full SEC-fetch-and-embed duration on small hosts.)
     """
-    ensure_indexed(symbol)
+    if not is_indexed(symbol):
+        ensure_indexed_async(symbol)
+        return "", []
     q = query or f"{symbol} business risks, recent performance, and outlook"
     chunks = retrieve_context(symbol, q, k=3)
     if not chunks:
@@ -248,6 +318,8 @@ def build_chat_filing_context(tickers: list[str], query: str,
     full 400-word excerpts would balloon the prompt for little gain).
     The user's own message is the retrieval query — free-text embeds well.
     """
+    if _DISABLED:
+        return ""
     blocks: list[str] = []
     for sym in [t.strip().upper() for t in tickers][:2]:
         if not is_indexed(sym):

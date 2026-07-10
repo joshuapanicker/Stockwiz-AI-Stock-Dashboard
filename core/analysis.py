@@ -63,14 +63,17 @@ def _parse_decision(text: str) -> str | None:
 
 
 def _warm_filing_index(symbol: str) -> None:
-    """Fetch + embed this ticker's filings if stale — the slow half of RAG.
-    Runs in parallel with metrics/news so the later retrieval is instant."""
+    """Kick off background indexing of this ticker's filings if stale.
+    Fire-and-forget — returns immediately. The analysis request must NEVER
+    wait on SEC fetching + embedding (it hung analyses for the full
+    duration on small hosts); an unindexed ticker just gets an ungrounded
+    analysis this time and a grounded one once the background job lands."""
     # Lazy import — sentence-transformers/chromadb are heavy to load and
     # RAG grounding is optional, so a module import failure here shouldn't
     # take down every caller of core.analysis.
     try:
-        from core.rag_index import ensure_indexed
-        ensure_indexed(symbol)
+        from core.rag_index import ensure_indexed_async
+        ensure_indexed_async(symbol)
     except Exception:
         pass
 
@@ -144,16 +147,16 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
     if cached:
         return cached
 
-    # Metrics, market context, news, and filing-index warm-up are independent
-    # network fetches — run them concurrently instead of paying for each in
-    # sequence. Only the index WARM-UP happens here (SEC fetch + embedding,
-    # the slow half of RAG); the actual retrieval waits until after criteria
-    # evaluation so its query can target what this analysis hinges on.
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    # Kick off background filing indexing first (returns instantly — the
+    # actual work happens on a daemon thread and never blocks this request).
+    _warm_filing_index(symbol)
+
+    # Metrics, market context, and news are independent network fetches —
+    # run them concurrently instead of paying for each in sequence.
+    with ThreadPoolExecutor(max_workers=3) as pool:
         f_metrics = pool.submit(get_stock_metrics, symbol)
         f_market = pool.submit(get_market_context)
         f_news = pool.submit(build_news_context, symbol)
-        pool.submit(_warm_filing_index, symbol)
         metrics = f_metrics.result()
         market = f_market.result()
         try:
@@ -166,8 +169,9 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
                                         gain_pct=gain_pct, user_id=user_id)
 
     # Retrieval query derived from the rules that matter for this decision
-    # (triggered rules for a sell, failing rules for a buy) — the index is
-    # already warm from the parallel block above, so this lookup is fast.
+    # (triggered rules for a sell, failing rules for a buy). Fast local
+    # lookup if the ticker is indexed; returns empty (ungrounded analysis)
+    # if the background indexing job hasn't landed yet.
     retrieval_query = _build_retrieval_query(symbol, action, criteria_result)
     filing_ctx, filing_sources = _get_filing_context(symbol, retrieval_query)
 
