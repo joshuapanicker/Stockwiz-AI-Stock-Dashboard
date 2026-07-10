@@ -68,11 +68,15 @@ def _get_embedder():
     global _embedder
     with _embedder_lock:
         if _embedder is None:
-            # Keep torch from spawning a thread per visible core — on a small
-            # shared host that thrashes and starves concurrent API requests.
+            # Keep torch from spawning a thread per visible core. Containers
+            # commonly report the HOST's full core count via os.cpu_count()
+            # even when only a small cgroup share is actually allocated
+            # (Railway's small plans), so deriving the cap from that count
+            # is unreliable — a low hardcoded default is safer than a
+            # calculation that can still come out too high.
             try:
                 import torch
-                torch.set_num_threads(max(1, min(4, (os.cpu_count() or 2) // 2)))
+                torch.set_num_threads(int(os.getenv("RAG_TORCH_THREADS", "2")))
             except Exception:
                 pass
             _embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
