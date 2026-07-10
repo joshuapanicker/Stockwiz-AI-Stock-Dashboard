@@ -10,3 +10,10 @@ anyio
 httpx
 plaid-python
 dnspython
+
+# RAG grounding for stock analysis — CPU-only torch keeps the deploy lean
+# (no CUDA build; embedding runs fine on CPU for this workload)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+sentence-transformers
+chromadb

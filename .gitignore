@@ -22,6 +22,10 @@ data/universe.db-wal
 # Local AI usage tracking (only used when Supabase isn't configured)
 data/ai_usage.json
 
+# RAG filing index (auto-populated at runtime)
+data/rag_chroma/
+data/rag_index_state.json
+
 # Editor
 .vscode/
 
