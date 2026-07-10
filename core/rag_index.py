@@ -30,6 +30,7 @@ import re
 import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 # On hosted deploys, point RAG_DB_PATH at a persistent volume so the index
@@ -182,13 +183,37 @@ def ensure_indexed(symbol: str) -> None:
         pass  # grounding is a bonus, not a hard requirement — never break analysis over it
 
 
+# Single shared background worker, not one OS thread per call: a burst of
+# calls to ensure_indexed_async (e.g. many tickers analyzed in quick
+# succession) previously spawned a fresh thread per symbol, and those
+# threads piled up waiting on _index_gate — enough of them accumulated
+# thread-stack memory to OOM-kill the container. Queueing onto one worker
+# costs nothing per queued item (no OS thread), no matter the burst size.
+_index_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rag-index")
+_pending: set[str] = set()
+_pending_lock = threading.Lock()
+
+
 def ensure_indexed_async(symbol: str) -> None:
     """Fire-and-forget indexing: a cold ticker gets indexed in the
     background so the NEXT analysis/chat about it is grounded, instead of
     stalling the current one."""
     if _DISABLED or is_indexed(symbol):
         return
-    threading.Thread(target=ensure_indexed, args=(symbol,), daemon=True).start()
+    symbol = symbol.strip().upper()
+    with _pending_lock:
+        if symbol in _pending:
+            return
+        _pending.add(symbol)
+
+    def _run():
+        try:
+            ensure_indexed(symbol)
+        finally:
+            with _pending_lock:
+                _pending.discard(symbol)
+
+    _index_pool.submit(_run)
 
 
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z\-]{2,}")
