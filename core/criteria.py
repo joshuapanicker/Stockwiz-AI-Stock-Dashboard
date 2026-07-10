@@ -88,6 +88,7 @@ def evaluate_criteria(mode: str, metrics: dict, market: dict,
             met += 1
         details.append({
             "id": rule["id"],
+            "field": rule.get("field"),
             "description": rule["description"],
             "passed": passed,
         })

@@ -133,20 +133,47 @@ def ensure_indexed(symbol: str) -> None:
 
 
 def retrieve_context(symbol: str, query: str, k: int = 3) -> list[dict]:
-    """Top-k most relevant indexed chunks for this ticker."""
+    """
+    Top-k most relevant indexed chunks for this ticker, diversified by
+    section. Risk Factors sections contain topic-dense "summary" paragraphs
+    that sit close to almost ANY query in embedding space and would crowd
+    out the quantitative MD&A discussion — so retrieval casts a wider net,
+    caps each section at 2 chunks, and guarantees at least one MD&A chunk
+    when one is available.
+    """
     try:
         collection = _get_collection()
         embedder = _get_embedder()
         results = collection.query(
             query_embeddings=[embedder.encode(query).tolist()],
-            n_results=k,
+            n_results=max(k * 4, 12),
             where={"ticker": symbol.strip().upper()},
         )
     except Exception:
         return []
     docs = (results.get("documents") or [[]])[0]
     metas = (results.get("metadatas") or [[]])[0]
-    return [{"text": d, **m} for d, m in zip(docs, metas)]
+    candidates = [{"text": d, **m} for d, m in zip(docs, metas)]
+
+    selected: list[dict] = []
+    per_section: dict[str, int] = {}
+    for c in candidates:
+        section = c.get("section", "")
+        if per_section.get(section, 0) >= 2:
+            continue
+        selected.append(c)
+        per_section[section] = per_section.get(section, 0) + 1
+        if len(selected) >= k:
+            break
+
+    # MD&A carries the quantitative discussion (actual revenue/margin
+    # figures) — if it exists in the candidates, make sure it's represented.
+    if selected and not any(c.get("section") == "mda" for c in selected):
+        mda = next((c for c in candidates if c.get("section") == "mda"), None)
+        if mda:
+            selected[-1] = mda
+
+    return selected
 
 
 def build_filing_context(symbol: str, query: str | None = None) -> str:

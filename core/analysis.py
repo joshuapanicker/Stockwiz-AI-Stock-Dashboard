@@ -62,13 +62,70 @@ def _parse_decision(text: str) -> str | None:
     return m.group(1).upper() if m else None
 
 
-def _get_filing_context(symbol: str) -> str:
+def _warm_filing_index(symbol: str) -> None:
+    """Fetch + embed this ticker's filings if stale — the slow half of RAG.
+    Runs in parallel with metrics/news so the later retrieval is instant."""
     # Lazy import — sentence-transformers/chromadb are heavy to load and
     # RAG grounding is optional, so a module import failure here shouldn't
     # take down every caller of core.analysis.
     try:
+        from core.rag_index import ensure_indexed
+        ensure_indexed(symbol)
+    except Exception:
+        pass
+
+
+# Screener rule fields → the language filings actually use for that topic.
+# Embedding raw rule text ("Forward PE under 25") retrieves poorly because
+# 10-K/10-Q prose never says "PE" — it talks about margins, net sales, and
+# demand. This translation is what makes criteria-driven retrieval land on
+# the right chunks.
+_FIELD_TOPICS = {
+    "trailing_pe":          "earnings performance, profitability outlook, and valuation drivers",
+    "forward_pe":           "expected earnings, guidance, and profitability outlook",
+    "revenue_growth":       "revenue and net sales trends, product demand, and sales outlook",
+    "earnings_growth":      "earnings, operating income performance, and income trends",
+    "profit_margin":        "gross margin, cost pressures, and pricing",
+    "operating_margin":     "operating margin, operating expenses, and cost structure",
+    "distance_to_low_pct":  "stock price performance, share repurchases, and capital return",
+    "distance_to_high_pct": "stock price performance, share repurchases, and capital return",
+    "market_trend":         "macroeconomic conditions, foreign exchange, and demand environment",
+    "vix":                  "macroeconomic conditions and market volatility impact",
+    "gain_pct":             "stock price appreciation and shareholder returns",
+}
+
+_GENERIC_QUERY = "business risks, recent performance, and outlook"
+
+
+def _build_retrieval_query(symbol: str, action: str, criteria_result: dict) -> str:
+    """
+    Task-specific retrieval: search the filings for what THIS analysis
+    actually hinges on, instead of a generic "risks and outlook" query.
+    For a sell analysis the triggered rules are the concerns to investigate;
+    for a buy analysis the failing rules are what's blocking the thesis.
+    """
+    details = criteria_result.get("details", [])
+    if action == "sell":
+        focus = [d for d in details if d.get("passed")]
+    else:
+        focus = [d for d in details if not d.get("passed")]
+    if not focus:  # nothing triggered/failing — fall back to the full rule set
+        focus = details
+
+    topics: list[str] = []
+    for d in focus:
+        topic = _FIELD_TOPICS.get(d.get("field") or "")
+        if topic and topic not in topics:
+            topics.append(topic)
+    if not topics:
+        return _GENERIC_QUERY
+    return ", ".join(topics[:3])
+
+
+def _get_filing_context(symbol: str, query: str) -> str:
+    try:
         from core.rag_index import build_filing_context
-        return build_filing_context(symbol)
+        return build_filing_context(symbol, query=query)
     except Exception:
         return ""
 
@@ -84,30 +141,32 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
     if cached:
         return cached
 
-    # Metrics, market context, news, and filing grounding are independent
+    # Metrics, market context, news, and filing-index warm-up are independent
     # network fetches — run them concurrently instead of paying for each in
-    # sequence. Filing context is the slow one on a cold ticker (SEC fetch +
-    # embedding), but build_filing_context() never raises and returns "" on
-    # any failure, so it can't break analysis even if RAG isn't set up yet.
+    # sequence. Only the index WARM-UP happens here (SEC fetch + embedding,
+    # the slow half of RAG); the actual retrieval waits until after criteria
+    # evaluation so its query can target what this analysis hinges on.
     with ThreadPoolExecutor(max_workers=4) as pool:
         f_metrics = pool.submit(get_stock_metrics, symbol)
         f_market = pool.submit(get_market_context)
         f_news = pool.submit(build_news_context, symbol)
-        f_filing = pool.submit(_get_filing_context, symbol)
+        pool.submit(_warm_filing_index, symbol)
         metrics = f_metrics.result()
         market = f_market.result()
         try:
             news_ctx = f_news.result()
         except Exception:
             news_ctx = ""
-        try:
-            filing_ctx = f_filing.result()
-        except Exception:
-            filing_ctx = ""
     # Same gain_pct + user criteria as the portfolio sell-signal checklist,
     # so the AI's rule counts always match what the UI displays.
     criteria_result = evaluate_criteria(action, metrics, market,
                                         gain_pct=gain_pct, user_id=user_id)
+
+    # Retrieval query derived from the rules that matter for this decision
+    # (triggered rules for a sell, failing rules for a buy) — the index is
+    # already warm from the parallel block above, so this lookup is fast.
+    retrieval_query = _build_retrieval_query(symbol, action, criteria_result)
+    filing_ctx = _get_filing_context(symbol, retrieval_query)
 
     from core.credits import metered_create
 
