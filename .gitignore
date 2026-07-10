@@ -22,9 +22,10 @@ data/universe.db-wal
 # Local AI usage tracking (only used when Supabase isn't configured)
 data/ai_usage.json
 
-# RAG filing index + model cache (auto-populated at runtime)
+# RAG filing index (auto-populated at runtime)
 data/rag_chroma/
 data/rag_index_state.json
+data/rag_fts_state.json
 data/hf_cache/
 
 # Distillation training data (accumulated from live AI calls)

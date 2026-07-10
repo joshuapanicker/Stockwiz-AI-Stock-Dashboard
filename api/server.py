@@ -93,18 +93,8 @@ async def prewarm():
         await asyncio.gather(*[asyncio.to_thread(warm, s) for s in symbols])
         # Start universe background fetcher in a thread
         start_background_fetcher()
-        # RAG: load the embedding model off the request path so the first
-        # real analysis doesn't pay that cost. Deliberately NOT pre-indexing
-        # the watchlist here — on a small shared host, 8 sequential
-        # SEC-fetch-and-embed jobs at boot starved every other endpoint
-        # (including plain SQLite reads like /universe/query) of CPU for
-        # minutes. Lazy on-demand indexing (triggered by real requests)
-        # already covers the actual use case without that startup burst.
-        try:
-            from core.rag_index import preload_embedder
-            await asyncio.to_thread(preload_embedder)
-        except Exception:
-            pass
+        # (RAG needs no warm-up: FTS5 retrieval has no model to load, and
+        # ticker indexing happens lazily in the background on first use.)
 
     asyncio.create_task(run())
 

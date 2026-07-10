@@ -68,9 +68,8 @@ def _warm_filing_index(symbol: str) -> None:
     wait on SEC fetching + embedding (it hung analyses for the full
     duration on small hosts); an unindexed ticker just gets an ungrounded
     analysis this time and a grounded one once the background job lands."""
-    # Lazy import — sentence-transformers/chromadb are heavy to load and
-    # RAG grounding is optional, so a module import failure here shouldn't
-    # take down every caller of core.analysis.
+    # Lazy import + broad except — RAG grounding is optional, so a problem
+    # in the index module must never take down analysis callers.
     try:
         from core.rag_index import ensure_indexed_async
         ensure_indexed_async(symbol)

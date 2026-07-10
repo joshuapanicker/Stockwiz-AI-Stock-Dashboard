@@ -1,110 +1,83 @@
 """
-RAG index for stock analysis — embeds SEC filing excerpts (Risk Factors,
-MD&A) per ticker into a local vector store, so analyze_stock() can ground
-its reasoning in real, current qualitative context instead of just
+RAG index for stock analysis — retrieves SEC filing excerpts (Risk
+Factors, MD&A) per ticker so analyze_stock() and the chats can ground
+their reasoning in real, current qualitative context instead of just
 numeric fundamentals.
 
-Uses a small CPU-friendly embedding model (no GPU required) and a local
-persistent Chroma store — no external service, no per-query cost.
+Retrieval engine: SQLite FTS5 (BM25 lexical search), NOT dense embeddings.
+The first version used sentence-transformers + Chroma; on the small hosted
+container the torch stack's memory footprint (~0.5GB RSS) caused OOM
+crash-loops that made the whole app unusable. For this corpus — two
+filings per ticker, ~40 chunks — BM25 keyword matching retrieves well,
+especially since the criteria→topic query translation (core/analysis.py)
+deliberately produces literal filing vocabulary ("gross margin",
+"net sales"). Zero extra dependencies, near-zero memory, instant queries.
 
-Performance contract (learned the hard way on Railway's small shared CPU):
-  - NOTHING here may block a user-facing request. Indexing (SEC fetch +
-    embedding) always happens on a background thread; request paths only
-    read an already-built index or return empty context.
-  - Only ONE indexing job runs at a time (_index_gate) so background
-    embedding can't peg the whole container and starve API requests.
-  - RAG_DISABLED=1 is a kill switch: skips the heavy imports entirely and
-    every entry point returns empty — instant rollback to pre-RAG behavior.
+Performance contract (learned the hard way):
+  - NOTHING here may block a user-facing request. Indexing (SEC fetches)
+    always happens on a background thread; request paths only read an
+    already-built index or return empty context.
+  - One indexing job at a time (_index_gate) — mostly to stay polite to
+    SEC's rate limits now that indexing itself is cheap.
+  - RAG_DISABLED=1 kill switch: every entry point returns empty.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
+import sqlite3
 import threading
 import time
 from pathlib import Path
 
 # On hosted deploys, point RAG_DB_PATH at a persistent volume so the index
-# survives redeploys — same convention as UNIVERSE_DB_PATH.
-DB_PATH = Path(os.getenv("RAG_DB_PATH") or (Path(__file__).parent.parent / "data" / "rag_chroma"))
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+# survives redeploys — same convention as UNIVERSE_DB_PATH. The value may
+# be a directory (the FTS database file is created inside it), which keeps
+# existing RAG_DB_PATH=/data/rag_chroma deployments working unchanged.
+_BASE = Path(os.getenv("RAG_DB_PATH") or (Path(__file__).parent.parent / "data" / "rag_chroma"))
+_BASE.mkdir(parents=True, exist_ok=True)
+DB_FILE = _BASE if _BASE.suffix == ".db" else _BASE / "fts.db"
 
-# Lives NEXT TO the index (i.e. on the same persistent volume in prod) —
-# if this tracked the repo dir instead, every deploy would wipe the
-# "what's indexed" bookkeeping and force re-indexing everything.
-_STATE_FILE = DB_PATH.parent / "rag_index_state.json"
-
-# Persist the HuggingFace model cache next to the index too, so the ~130MB
-# embedding model isn't re-downloaded on every deploy. Must be set before
-# sentence_transformers is imported.
-os.environ.setdefault("HF_HOME", str(DB_PATH.parent / "hf_cache"))
-# Chroma phones telemetry home by default — no thanks.
-os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+# Fresh state filename: earlier state tracked the (now retired) embedding
+# index — reusing it would mark tickers "indexed" that have no FTS rows.
+_STATE_FILE = _BASE.parent / "rag_fts_state.json"
 
 _DISABLED = os.getenv("RAG_DISABLED") == "1"
 
-if not _DISABLED:
-    import chromadb
-    from sentence_transformers import SentenceTransformer
-
-    from core.filings import fetch_filing_sections
-
-# Filings update quarterly — no need to re-fetch/re-embed more often than this.
+# Filings update quarterly — no need to re-fetch more often than this.
 REINDEX_TTL = 25 * 86_400
 
-# Bound the embedding cost per filing section. Risk Factors sections can run
-# 60k+ chars (~40 chunks); the tail chunks add little retrieval value but a
-# lot of CPU time on a small host.
 MAX_CHUNKS_PER_SECTION = int(os.getenv("RAG_MAX_CHUNKS_PER_SECTION", "20"))
 
-_embedder = None
-_client = None
-_collection = None
-_embedder_lock = threading.Lock()
+_db_lock = threading.Lock()
+_schema_ready = False
 
 
-def _get_embedder():
-    global _embedder
-    with _embedder_lock:
-        if _embedder is None:
-            # Keep torch from spawning a thread per visible core. Containers
-            # commonly report the HOST's full core count via os.cpu_count()
-            # even when only a small cgroup share is actually allocated
-            # (Railway's small plans), so deriving the cap from that count
-            # is unreliable — a low hardcoded default is safer than a
-            # calculation that can still come out too high.
-            try:
-                import torch
-                torch.set_num_threads(int(os.getenv("RAG_TORCH_THREADS", "2")))
-            except Exception:
-                pass
-            _embedder = SentenceTransformer("BAAI/bge-small-en-v1.5")
-        return _embedder
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_FILE), check_same_thread=False, timeout=15)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def preload_embedder() -> None:
-    """Load the embedding model off the request path (server startup).
-    First call after a fresh volume also downloads it to the HF cache."""
-    if _DISABLED:
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    global _schema_ready
+    if _schema_ready:
         return
-    try:
-        _get_embedder()
-    except Exception:
-        pass
-
-
-def _get_collection():
-    global _client, _collection
-    if _collection is None:
-        _client = chromadb.PersistentClient(path=str(DB_PATH))
-        _collection = _client.get_or_create_collection("filings")
-    return _collection
+    conn.execute("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS filing_chunks USING fts5(
+            ticker UNINDEXED, form UNINDEXED, section UNINDEXED,
+            date UNINDEXED, text
+        )
+    """)
+    conn.commit()
+    _schema_ready = True
 
 
 def _chunk_text(text: str, words_per_chunk: int = 400, overlap: int = 50) -> list[str]:
-    """Word-based sliding window — approximates ~300-500 token chunks
-    without needing the target model's own tokenizer."""
+    """Word-based sliding window — keeps each excerpt small enough to be
+    retrieved precisely; overlap prevents a fact being cut in half."""
     words = text.split()
     if len(words) <= words_per_chunk:
         return [text]
@@ -131,20 +104,15 @@ def _save_state(state: dict) -> None:
     _STATE_FILE.write_text(json.dumps(state))
 
 
-# Guard against two callers indexing the same ticker simultaneously
-# (e.g. an analysis and a chat message about the same stock) — duplicate
-# chunk ids would make Chroma's add() raise mid-index.
+# Guard against two callers indexing the same ticker simultaneously, and
+# serialize indexing globally (politeness to SEC + zero CPU contention).
 _inflight: set[str] = set()
 _inflight_lock = threading.Lock()
-
-# Serialize indexing globally: one embed job at a time. Background threads
-# for other tickers simply wait their turn instead of collectively pegging
-# the CPU while user requests are in flight.
 _index_gate = threading.Semaphore(1)
 
 
 def index_ticker(symbol: str) -> int:
-    """Fetch, chunk, and embed this ticker's latest filing sections.
+    """Fetch this ticker's latest filing sections and index the chunks.
     Returns the number of chunks indexed."""
     if _DISABLED:
         return 0
@@ -162,43 +130,37 @@ def index_ticker(symbol: str) -> int:
 
 
 def _index_ticker_inner(symbol: str) -> int:
+    from core.filings import fetch_filing_sections
     sections = fetch_filing_sections(symbol)
 
-    collection = _get_collection()
-    # Clear this ticker's old chunks first so stale excerpts from a
-    # previous filing don't linger alongside the fresh ones.
-    try:
-        collection.delete(where={"ticker": symbol})
-    except Exception:
-        pass
-
-    count = 0
-    if sections:
-        embedder = _get_embedder()
-        for sec in sections:
-            chunks = _chunk_text(sec["text"])[:MAX_CHUNKS_PER_SECTION]
-            if not chunks:
+    rows: list[tuple] = []
+    for sec in sections:
+        for chunk in _chunk_text(sec["text"])[:MAX_CHUNKS_PER_SECTION]:
+            # Skip the forward-looking-statements legal boilerplate: it's
+            # packed with generic finance words ("trends", "demand",
+            # "outlook") so it ranks high for almost any query, while
+            # containing zero actual information to ground on.
+            if "forward-looking statements" in chunk.lower():
                 continue
-            # One batched encode per section — dramatically faster than
-            # embedding chunk-by-chunk.
-            embeddings = embedder.encode(chunks, batch_size=16,
-                                         show_progress_bar=False).tolist()
-            collection.add(
-                embeddings=embeddings,
-                documents=chunks,
-                metadatas=[{
-                    "ticker": symbol, "form": sec["form"],
-                    "section": sec["section"], "date": sec["date"],
-                } for _ in chunks],
-                ids=[f"{symbol}-{sec['form']}-{sec['section']}-{i}"
-                     for i in range(len(chunks))],
-            )
-            count += len(chunks)
+            rows.append((symbol, sec["form"], sec["section"], sec["date"], chunk))
+
+    with _db_lock:
+        with _connect() as conn:
+            _ensure_schema(conn)
+            # Clear this ticker's old chunks so stale excerpts from a
+            # previous filing don't linger alongside the fresh ones.
+            conn.execute("DELETE FROM filing_chunks WHERE ticker = ?", (symbol,))
+            if rows:
+                conn.executemany(
+                    "INSERT INTO filing_chunks (ticker, form, section, date, text) VALUES (?,?,?,?,?)",
+                    rows,
+                )
+            conn.commit()
 
     state = _load_state()
     state[symbol] = time.time()
     _save_state(state)
-    return count
+    return len(rows)
 
 
 def is_indexed(symbol: str) -> bool:
@@ -211,7 +173,7 @@ def is_indexed(symbol: str) -> bool:
 
 def ensure_indexed(symbol: str) -> None:
     """(Re-)index a ticker if it's never been indexed or is stale.
-    Blocking — only call from background threads, never a request path."""
+    Blocking on SEC fetches — only call from background threads."""
     if _DISABLED or is_indexed(symbol):
         return
     try:
@@ -223,36 +185,73 @@ def ensure_indexed(symbol: str) -> None:
 def ensure_indexed_async(symbol: str) -> None:
     """Fire-and-forget indexing: a cold ticker gets indexed in the
     background so the NEXT analysis/chat about it is grounded, instead of
-    stalling the current one for seconds of SEC fetching + embedding."""
+    stalling the current one."""
     if _DISABLED or is_indexed(symbol):
         return
     threading.Thread(target=ensure_indexed, args=(symbol,), daemon=True).start()
 
 
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z\-]{2,}")
+_STOPWORDS = {
+    "and", "the", "for", "with", "are", "was", "has", "have", "how", "what",
+    "their", "them", "they", "this", "that", "its", "his", "her", "our",
+    "your", "about", "related", "recent", "holding", "doing",
+}
+
+
+def _fts_query(query: str) -> str | None:
+    """Turn free text into an FTS5 OR-query over the text column.
+
+    Includes adjacent-word phrases ("gross margin", "net sales") alongside
+    single tokens: a chunk containing the exact phrase matches the phrase
+    term AND both word terms, so BM25 ranks it well above chunks that just
+    scatter the same words — which is what keeps generic finance
+    boilerplate (packed with common words) out of the top ranks.
+    Everything is quoted so user text can't break the match syntax.
+    """
+    words = _WORD_RE.findall(query.lower())
+    terms: list[str] = []
+    for a, b in zip(words, words[1:]):
+        if a not in _STOPWORDS and b not in _STOPWORDS:
+            phrase = f'"{a} {b}"'
+            if phrase not in terms:
+                terms.append(phrase)
+    for w in words:
+        single = f'"{w}"'
+        if w not in _STOPWORDS and single not in terms:
+            terms.append(single)
+    if not terms:
+        return None
+    return "text:(" + " OR ".join(terms[:24]) + ")"
+
+
 def retrieve_context(symbol: str, query: str, k: int = 3) -> list[dict]:
     """
-    Top-k most relevant indexed chunks for this ticker, diversified by
-    section. Risk Factors sections contain topic-dense "summary" paragraphs
-    that sit close to almost ANY query in embedding space and would crowd
-    out the quantitative MD&A discussion — so retrieval casts a wider net,
-    caps each section at 2 chunks, and guarantees at least one MD&A chunk
-    when one is available.
+    Top-k most relevant indexed chunks for this ticker (BM25), diversified
+    by section: Risk Factors "summary" paragraphs are topic-dense and match
+    almost any query, crowding out the quantitative MD&A discussion — so
+    retrieval casts a wider net, caps each section at 2 chunks, and
+    guarantees at least one MD&A chunk when one is available.
     """
     if _DISABLED:
         return []
+    match = _fts_query(query)
+    if not match:
+        return []
     try:
-        collection = _get_collection()
-        embedder = _get_embedder()
-        results = collection.query(
-            query_embeddings=[embedder.encode(query).tolist()],
-            n_results=max(k * 4, 12),
-            where={"ticker": symbol.strip().upper()},
-        )
+        with _connect() as conn:
+            _ensure_schema(conn)
+            rows = conn.execute(
+                """SELECT ticker, form, section, date, text,
+                          bm25(filing_chunks) AS score
+                   FROM filing_chunks
+                   WHERE filing_chunks MATCH ? AND ticker = ?
+                   ORDER BY score LIMIT ?""",
+                (match, symbol.strip().upper(), max(k * 4, 12)),
+            ).fetchall()
     except Exception:
         return []
-    docs = (results.get("documents") or [[]])[0]
-    metas = (results.get("metadatas") or [[]])[0]
-    candidates = [{"text": d, **m} for d, m in zip(docs, metas)]
+    candidates = [dict(r) for r in rows]
 
     selected: list[dict] = []
     per_section: dict[str, int] = {}
@@ -288,8 +287,7 @@ def build_filing_context_with_sources(symbol: str, query: str | None = None) -> 
 
     Non-blocking: a ticker that isn't indexed yet returns ("", []) and gets
     indexed in the background — its first analysis is ungrounded but fast,
-    the next one is grounded. (Blocking here used to hang analyses for the
-    full SEC-fetch-and-embed duration on small hosts.)
+    the next one is grounded.
     """
     if not is_indexed(symbol):
         ensure_indexed_async(symbol)
@@ -320,7 +318,7 @@ def build_chat_filing_context(tickers: list[str], query: str,
     cold ticker never stalls the reply — it's indexed in the background for
     the next message instead. Chunks are truncated (chat replies are short;
     full 400-word excerpts would balloon the prompt for little gain).
-    The user's own message is the retrieval query — free-text embeds well.
+    The user's own message is the retrieval query.
     """
     if _DISABLED:
         return ""
