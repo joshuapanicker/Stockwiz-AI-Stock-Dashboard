@@ -172,18 +172,28 @@ def analyze_stock(symbol: str, action: str, gain_pct: float | None = None,
 
     prompt = _build_prompt(symbol, action, criteria_result, metrics, market, news_ctx,
                            gain_pct=gain_pct, filing_ctx=filing_ctx)
+    model = "claude-haiku-4-5-20251001"
+    system = ("You are a disciplined stock analysis assistant. "
+              "Use only the provided data. Do not fabricate missing values.")
     message = metered_create(
         user_id,
-        model="claude-haiku-4-5-20251001",
+        model=model,
         max_tokens=300,
-        system=(
-            "You are a disciplined stock analysis assistant. "
-            "Use only the provided data. Do not fabricate missing values."
-        ),
+        system=system,
         messages=[{"role": "user", "content": prompt}],
     )
 
     analysis_text = message.content[0].text if message.content else ""
+
+    # Distillation logging: every fresh analysis is a free training example
+    # for the future fine-tuned model — the exact prompt (with RAG filing
+    # context included) paired with what Claude produced. Never raises.
+    from core.distill_log import log_example
+    log_example(
+        task="stock_analysis", system=system, prompt=prompt,
+        output=analysis_text, model=model,
+        meta={"symbol": symbol, "action": action, "gain_pct": gain_pct},
+    )
     result = {
         "symbol": symbol,
         "action": action,

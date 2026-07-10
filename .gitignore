@@ -26,6 +26,9 @@ data/ai_usage.json
 data/rag_chroma/
 data/rag_index_state.json
 
+# Distillation training data (accumulated from live AI calls)
+data/distill_log.jsonl
+
 # Editor
 .vscode/
 
