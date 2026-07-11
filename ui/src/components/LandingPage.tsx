@@ -8,6 +8,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useInView } from "../hooks/useInView";
 import { apiFetch } from "../hooks/useApi";
+import { TermsOfService, PrivacyPolicy } from "./LegalPages";
 
 // ── Animated counter ──────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ function isAccountExistsError(msg: string): boolean {
   return m.includes("already registered") || m.includes("already exists") || m.includes("user already");
 }
 
-function AuthForm() {
+function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onOpenPrivacy: () => void }) {
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
@@ -100,6 +101,9 @@ function AuthForm() {
     e.preventDefault();
     setError(null); setSuccess(null);
     if (!email.trim() || !password.trim()) { setError("Email and password required."); return; }
+    if (mode === "signup" && password.length < 8) {
+      setError("Password must be at least 8 characters."); return;
+    }
     setLoading(true);
     if (mode === "login") {
       const { error } = await signIn(email, password);
@@ -184,7 +188,7 @@ function AuthForm() {
         <div className="flex items-center gap-2 bg-card2 border border-border rounded-xl px-3 py-2.5 focus-within:border-green/40 transition-colors">
           <Lock size={13} className="text-muted flex-shrink-0" />
           <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "Min 6 characters" : "Password"}
+            placeholder={mode === "signup" ? "Min 8 characters" : "Password"}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             className="flex-1 bg-transparent text-sm text-white placeholder-muted focus:outline-none" />
           <button type="button" onClick={() => setShowPw(v => !v)} className="text-muted hover:text-white transition-colors">
@@ -217,6 +221,15 @@ function AuthForm() {
           {mode === "signup" ? "Sign in" : "Sign up free"}
         </button>
       </p>
+      {mode === "signup" && (
+        <p className="text-center text-[10px] text-muted/70 mt-2 leading-relaxed">
+          By creating an account you agree to our{" "}
+          <button type="button" onClick={onOpenTerms} className="text-muted hover:text-white underline">Terms</button>
+          {" "}and{" "}
+          <button type="button" onClick={onOpenPrivacy} className="text-muted hover:text-white underline">Privacy Policy</button>.
+          StockWiz does not provide financial advice.
+        </p>
+      )}
     </div>
   );
 }
@@ -389,6 +402,8 @@ function ScrollFeatureShowcase() {
 
 export default function LandingPage() {
   const authRef = useRef<HTMLDivElement>(null);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   function scrollToAuth() {
     authRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -574,7 +589,7 @@ export default function LandingPage() {
       <section className="relative z-10 px-8 py-12 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { icon: <Bot size={17}/>,         title: "AI Stock Analysis",       desc: "Claude AI analyzes every stock with live data injected — no hallucinations, no generic advice.", delay: 0 },
+            { icon: <Bot size={17}/>,         title: "AI Stock Analysis",       desc: "Claude AI analyzes every stock with live data injected — grounded in real numbers, not generic advice.", delay: 0 },
             { icon: <Zap size={17}/>,         title: "Natural Language Search", desc: "Ask 'profitable tech stocks under PE 25' and get a filtered list back in seconds.", delay: 60 },
             { icon: <BarChart2 size={17}/>,   title: "Volume Profile Chart",    desc: "Real historical volume by price level — identifies support and resistance, not fake order book data.", delay: 120 },
             { icon: <TrendingUp size={17}/>,  title: "Portfolio P&L",           desc: "Track your real gains with auto-lookup of historical buy prices and AI sell signals.", delay: 0 },
@@ -653,7 +668,7 @@ export default function LandingPage() {
               Join investors using StockWiz to make data-driven decisions backed by live AI analysis.
             </p>
             <div className="flex justify-center">
-              <AuthForm />
+              <AuthForm onOpenTerms={() => setTermsOpen(true)} onOpenPrivacy={() => setPrivacyOpen(true)} />
             </div>
           </div>
         </FadeIn>
@@ -668,13 +683,16 @@ export default function LandingPage() {
             </div>
             <span className="text-white font-semibold text-sm">StockWiz</span>
           </div>
-          <p className="text-muted text-xs">© 2026 StockWiz · Not financial advice. Past performance does not guarantee future results.</p>
+          <p className="text-muted text-xs">© 2026 StockWiz · Not financial, investment, or tax advice. For informational purposes only. Past performance does not guarantee future results.</p>
           <div className="flex gap-6 text-xs text-muted">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
+            <button onClick={() => setPrivacyOpen(true)} className="hover:text-white transition-colors">Privacy</button>
+            <button onClick={() => setTermsOpen(true)} className="hover:text-white transition-colors">Terms</button>
           </div>
         </div>
       </footer>
+
+      <TermsOfService open={termsOpen} onClose={() => setTermsOpen(false)} />
+      <PrivacyPolicy open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
 
       {/* Float keyframe */}
       <style>{`

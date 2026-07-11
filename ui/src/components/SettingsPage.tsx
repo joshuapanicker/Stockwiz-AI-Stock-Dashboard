@@ -4,6 +4,7 @@ import { ArrowLeft, SlidersHorizontal, Bell, Shield, RefreshCw, User, ChevronDow
 import CriteriaBuilder, { type CriteriaConfig } from "./CriteriaBuilder";
 import AlertsEditor from "./AlertsEditor";
 import PlaidConnect from "./PlaidConnect";
+import { TermsOfService, PrivacyPolicy } from "./LegalPages";
 import { apiFetch, useProfile, useCredits, useTrackRecord, type TrackRecordBucket } from "../hooks/useApi";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -546,6 +547,8 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [criteria, setCriteria] = useState<CriteriaConfig | null>(null);
   const [loadingCriteria, setLoadingCriteria] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
 
   // Sync tab when opened with a specific tab
   useEffect(() => { if (open) setActiveTab(initialTab); }, [open, initialTab]);
@@ -688,11 +691,27 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
                 </p>
               </div>
               <ConnectedAccountsSection />
+
+              <h2 className="text-white font-bold text-xl mb-2 mt-8">Legal</h2>
+              <div className="bg-card2 rounded-2xl border border-border/40 px-6 py-4 flex items-center gap-6">
+                <button onClick={() => setTermsOpen(true)}
+                  className="text-sm text-muted hover:text-white transition-colors underline underline-offset-2">
+                  Terms of Service
+                </button>
+                <button onClick={() => setPrivacyOpen(true)}
+                  className="text-sm text-muted hover:text-white transition-colors underline underline-offset-2">
+                  Privacy Policy
+                </button>
+              </div>
+
               <DeleteAccountSection />
             </div>
           )}
         </div>
       </div>
+
+      <TermsOfService open={termsOpen} onClose={() => setTermsOpen(false)} />
+      <PrivacyPolicy open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </div>
   );
 }

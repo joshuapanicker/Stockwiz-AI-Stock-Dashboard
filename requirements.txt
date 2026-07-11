@@ -10,5 +10,6 @@ anyio
 httpx
 plaid-python
 dnspython
+cryptography
 # RAG retrieval is SQLite FTS5 (stdlib) — the earlier torch/
 # sentence-transformers/chromadb stack OOM'd the small hosted container.

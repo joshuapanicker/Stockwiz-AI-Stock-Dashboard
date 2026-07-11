@@ -123,9 +123,10 @@ def get_holdings(access_token: str) -> list[dict]:
 def save_plaid_token(user_id: str, access_token: str, institution_name: str = "", item_id: str = "") -> None:
     """Store a new Plaid access token — supports multiple connections per user."""
     from core.db import get_client
+    from core.crypto import encrypt
     get_client().table("plaid_connections").insert({
         "user_id": user_id,
-        "access_token": access_token,
+        "access_token": encrypt(access_token),
         "item_id": item_id,
         "institution_name": institution_name,
         "updated_at": "now()",
@@ -133,14 +134,20 @@ def save_plaid_token(user_id: str, access_token: str, institution_name: str = ""
 
 
 def get_plaid_tokens(user_id: str) -> list[dict]:
-    """Retrieve all Plaid connections for a user."""
+    """Retrieve all Plaid connections for a user, with access tokens
+    decrypted in place so every caller works with the usable value."""
     from core.db import get_client
+    from core.crypto import decrypt
     res = (get_client().table("plaid_connections")
            .select("*")
            .eq("user_id", user_id)
            .order("updated_at", desc=False)
            .execute())
-    return res.data or []
+    rows = res.data or []
+    for row in rows:
+        if row.get("access_token"):
+            row["access_token"] = decrypt(row["access_token"])
+    return rows
 
 
 def get_plaid_token(user_id: str) -> str | None:

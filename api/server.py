@@ -44,16 +44,59 @@ import math
 from fastapi.responses import JSONResponse
 
 app = FastAPI(title="StockWiz API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Ensure CORS headers are present even on unhandled 500 errors
+# ── CORS ────────────────────────────────────────────────────────────────────
+# Restricted to our own frontends instead of "*". Auth is via Bearer tokens
+# (not cookies), so this is defense-in-depth: it stops arbitrary origins from
+# scripting the API and keeps browser errors readable only for our own app.
+# Override/extend via env without a code change.
+import re
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+# Matches the production Vercel domain (including preview deploys) + localhost.
+_ORIGIN_REGEX = os.getenv(
+    "ALLOWED_ORIGIN_REGEX",
+    r"^https://stockwiz-ai-stock-dashboard[\w-]*\.vercel\.app$|^http://localhost:\d+$",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=_ORIGIN_REGEX,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _cors_origin(request) -> str | None:
+    """The request's Origin if it's one we allow — so error/limit responses
+    (which bypass the CORS middleware) stay readable by our own frontend."""
+    origin = request.headers.get("origin", "")
+    if not origin:
+        return None
+    if origin in ALLOWED_ORIGINS:
+        return origin
+    if _ORIGIN_REGEX and re.match(_ORIGIN_REGEX, origin):
+        return origin
+    return None
+
+
+def _cors_headers(request) -> dict:
+    o = _cors_origin(request)
+    return {"Access-Control-Allow-Origin": o} if o else {}
+
+
+# Unhandled errors: log the real cause server-side, return a generic message.
+# Never echo str(exc) to the client — it can leak internal paths, DB errors,
+# and stack context that help an attacker map the system.
+import logging as _logging
+_log = _logging.getLogger("stockwiz")
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
-    from fastapi.responses import JSONResponse
+    _log.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc)},
-        headers={"Access-Control-Allow-Origin": "*"},
+        content={"detail": "Internal server error"},
+        headers=_cors_headers(request),
     )
 
 
@@ -64,7 +107,7 @@ async def credits_exhausted_handler(request, exc):
     return JSONResponse(
         status_code=402,
         content={"detail": str(exc), "code": "credits_exhausted"},
-        headers={"Access-Control-Allow-Origin": "*"},
+        headers=_cors_headers(request),
     )
 
 
@@ -133,6 +176,50 @@ async def sanitize_response(request, call_next):
         from starlette.responses import Response
         return Response(content=body, status_code=response.status_code,
                         headers=dict(response.headers), media_type="application/json")
+
+
+# ── Rate limiting ─────────────────────────────────────────────────────────
+# Lightweight in-memory sliding window per client IP. No new dependency (the
+# earlier torch stack OOM'd this container, so we keep additions minimal) and
+# no shared store needed on a single-worker deploy. AI/LLM paths get a tighter
+# budget than ordinary reads. Generous by default so normal use never trips;
+# tune via env. Skips CORS preflight (OPTIONS).
+import time as _time
+from collections import defaultdict, deque
+
+_RL_WINDOW = 60.0
+_RL_MAX = int(os.getenv("RATE_LIMIT_PER_MIN", "200"))
+_RL_AI_MAX = int(os.getenv("RATE_LIMIT_AI_PER_MIN", "60"))
+_RL_AI_PREFIXES = ("/api/analyze", "/api/predict", "/api/chat",
+                   "/api/general-chat", "/api/universe/agent")
+_RL_HITS: dict[str, deque] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit(request, call_next):
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    path = request.url.path
+    is_ai = path.startswith(_RL_AI_PREFIXES)
+    limit = _RL_AI_MAX if is_ai else _RL_MAX
+    bucket = _RL_HITS[f"{ip}:{'ai' if is_ai else 'gen'}"]
+    now = _time.monotonic()
+    while bucket and now - bucket[0] > _RL_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= limit:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too many requests. Please slow down and try again shortly."},
+            headers=_cors_headers(request),
+        )
+    bucket.append(now)
+    # Opportunistic cleanup so the map can't grow unbounded across many IPs.
+    if len(_RL_HITS) > 10_000:
+        for k in [k for k, v in list(_RL_HITS.items()) if not v]:
+            _RL_HITS.pop(k, None)
+    return await call_next(request)
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────

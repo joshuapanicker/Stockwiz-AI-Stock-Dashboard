@@ -110,9 +110,11 @@ def get_user_api_key(user_id: str | None) -> str | None:
     if not sb:
         return None
     try:
+        from core.crypto import decrypt
         res = (sb.table("user_api_keys").select("anthropic_key")
                .eq("user_id", user_id).execute())
         key = res.data[0]["anthropic_key"] if res.data else None
+        key = decrypt(key)
         return key.strip() if key else None
     except Exception:
         return None
@@ -122,8 +124,9 @@ def set_user_api_key(user_id: str, key: str) -> None:
     sb = _supabase()
     if not sb:
         raise RuntimeError("Supabase not configured")
+    from core.crypto import encrypt
     (sb.table("user_api_keys")
-     .upsert({"user_id": user_id, "anthropic_key": key.strip(),
+     .upsert({"user_id": user_id, "anthropic_key": encrypt(key.strip()),
               "updated_at": datetime.now(timezone.utc).isoformat()},
              on_conflict="user_id")
      .execute())
