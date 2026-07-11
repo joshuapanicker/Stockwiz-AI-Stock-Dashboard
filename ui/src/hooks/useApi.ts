@@ -324,7 +324,10 @@ export function useUniverseStatus() {  const [data, setData] = useState<any | nu
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 5000);
+    // Background-fetch progress, not time-critical — 5s was needlessly
+    // aggressive given this hook mounts independently in multiple
+    // components, multiplying request volume under real traffic.
+    const interval = setInterval(refresh, 20000);
     return () => clearInterval(interval);
   }, [refresh]);
 

@@ -47,3 +47,6 @@ ui/.env.local
 # PDFs and documents
 *.pdf
 *.docx
+
+# Personal AI architecture reference (kept local, never committed)
+AI_ARCHITECTURE.md

@@ -116,14 +116,31 @@ def _download_listed_symbols(timeout: float = 30.0) -> list[str]:
     return out
 
 
+# In-memory cache: this file only changes when refresh_universe_symbols()
+# writes it (at most a few times a day), but /api/universe/status polls it
+# every 5s from every connected client — re-reading and re-parsing a
+# ~5,700-entry JSON file that often added real, avoidable CPU/memory churn
+# under concurrent load. Short TTL keeps it fresh without the per-poll cost.
+_file_cache: dict | None = None
+_file_cache_time = 0.0
+_FILE_CACHE_TTL = 30.0  # seconds
+
+
 def _read_universe_file() -> dict:
+    global _file_cache, _file_cache_time
+    now = time.time()
+    if _file_cache is not None and (now - _file_cache_time) < _FILE_CACHE_TTL:
+        return _file_cache
     try:
         data = json.loads(UNIVERSE_FILE.read_text())
         if isinstance(data, dict) and data.get("symbols"):
+            _file_cache, _file_cache_time = data, now
             return data
     except Exception:
         pass
-    return {"updated": 0, "source": "none", "symbols": [], "core_symbols": []}
+    fallback = {"updated": 0, "source": "none", "symbols": [], "core_symbols": []}
+    _file_cache, _file_cache_time = fallback, now
+    return fallback
 
 
 def refresh_universe_symbols(force: bool = False) -> dict:
