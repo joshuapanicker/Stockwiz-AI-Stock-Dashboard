@@ -31,6 +31,13 @@ data/hf_cache/
 # Distillation training data (accumulated from live AI calls)
 data/distill_log.jsonl
 
+# Trained model artifacts (fine-tuned LoRA adapters — large binaries, must
+# never be committed or deployed; store/serve them separately)
+TrainedModelData/
+*.safetensors
+*.gguf
+*.zip
+
 # Editor
 .vscode/
 
