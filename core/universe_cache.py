@@ -36,6 +36,7 @@ import json
 import math
 import os
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -62,13 +63,37 @@ COLUMNS = [
 ]
 
 
+# One connection PER THREAD, opened once and reused for that thread's
+# lifetime — not a fresh connection on every call. `with _connect() as
+# conn:` only commits/rolls back the transaction on exit, it does NOT
+# close the connection (a common sqlite3 gotcha), so the previous "open a
+# fresh connection every call" pattern leaked a connection (OS file
+# descriptor + WAL/SHM churn) on every read and write — including once per
+# symbol in the background fetcher's cycle (~6k times/hour) and on every
+# /api/universe/status poll. That churn was a real, recurring contributor
+# to the container's memory pressure.
+#
+# Thread-local (not a single shared connection) so no two threads ever
+# execute statements on the same Connection object concurrently — SQLite
+# connections aren't safe for that without external locking around every
+# call site, and not all call sites here are lock-protected. This bounds
+# total open connections to "however many threads actually call this"
+# (a handful: uvicorn's worker threads + the fetcher's fixed thread pool),
+# not thousands per hour.
+_local = threading.local()
+
+
 def _connect() -> sqlite3.Connection:
+    conn = getattr(_local, "conn", None)
+    if conn is not None:
+        return conn
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row
     # WAL lets API reads proceed while the background fetcher writes —
     # essential now that the universe is ~6k symbols and writes are constant.
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    _local.conn = conn
     return conn
 
 

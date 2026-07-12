@@ -56,9 +56,23 @@ _db_lock = threading.Lock()
 _schema_ready = False
 
 
+# One connection per thread, opened once and reused — see the matching
+# note in core/universe_cache.py. `with _connect() as conn:` only
+# commits/rolls back on exit, it never closes the connection, so
+# re-opening one on every call (as before) leaked a connection on every
+# filing lookup/insert. Thread-local rather than one shared connection so
+# concurrent reads/writes across threads (only the write path is under
+# _db_lock) can never execute on the same Connection object at once.
+_local = threading.local()
+
+
 def _connect() -> sqlite3.Connection:
+    conn = getattr(_local, "conn", None)
+    if conn is not None:
+        return conn
     conn = sqlite3.connect(str(DB_FILE), check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row
+    _local.conn = conn
     return conn
 
 
