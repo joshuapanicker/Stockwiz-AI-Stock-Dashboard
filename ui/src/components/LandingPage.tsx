@@ -15,7 +15,7 @@ import PipelineShowcase from "./landing/PipelineShowcase";
 import TrackRecordLedger from "./landing/TrackRecordLedger";
 import TypeWall from "./landing/TypeWall";
 import WireTerrain from "./landing/WireTerrain";
-import { GlitchText, ScrambleLink, VelocityWarp } from "./landing/Effects";
+import { GlitchText, ScrambleLink, VelocityWarp, SpotlightCard } from "./landing/Effects";
 import { DataConstellation, CursorGlow, ScrollProgress, TickerTape, AmbientWashes } from "./landing/Atmosphere";
 
 // ── 3D tilt on hover — cards lean toward the cursor ───────────────────────
@@ -108,20 +108,40 @@ function MicroTicker() {
   );
 }
 
-// ── Fade-in wrapper ───────────────────────────────────────────────────────
+// ── Fade-in wrapper — every section arrives its own way ──────────────────
+// Variants beyond the basic slides: "blur" (sharpens out of a haze),
+// "tilt-left"/"tilt-right" (deals in rotated like a card), "zoom" (grows
+// into place), "flip" (swings in on a vertical hinge).
+
+type FadeDir = "up" | "left" | "right" | "none" | "blur" | "tilt-left" | "tilt-right" | "zoom" | "flip";
+
+const FADE_HIDDEN: Record<FadeDir, { transform: string; filter?: string }> = {
+  up:           { transform: "translateY(28px)" },
+  left:         { transform: "translateX(-28px)" },
+  right:        { transform: "translateX(28px)" },
+  none:         { transform: "none" },
+  blur:         { transform: "scale(1.05)", filter: "blur(14px)" },
+  "tilt-left":  { transform: "translateX(-44px) rotate(-4deg) scale(0.96)" },
+  "tilt-right": { transform: "translateX(44px) rotate(4deg) scale(0.96)" },
+  zoom:         { transform: "scale(0.86)" },
+  flip:         { transform: "perspective(900px) rotateY(-14deg) translateX(-24px)" },
+};
 
 function FadeIn({ children, delay = 0, direction = "up", className = "" }: {
-  children: React.ReactNode; delay?: number; direction?: "up" | "left" | "right" | "none"; className?: string;
+  children: React.ReactNode; delay?: number; direction?: FadeDir; className?: string;
 }) {
   const { ref, inView } = useInView(0.1);
-  const transforms: Record<string, string> = {
-    up: "translateY(28px)", left: "translateX(-28px)", right: "translateX(28px)", none: "none",
-  };
+  const hidden = FADE_HIDDEN[direction];
   return (
     <div ref={ref} className={className} style={{
       opacity: inView ? 1 : 0,
-      transform: inView ? "none" : transforms[direction],
-      transition: `opacity 0.6s ease ${delay}ms, transform 0.6s ease ${delay}ms`,
+      transform: inView ? "none" : hidden.transform,
+      filter: inView ? "none" : hidden.filter,
+      transition: [
+        `opacity 0.7s ease ${delay}ms`,
+        `transform 0.7s cubic-bezier(0.16, 0.9, 0.24, 1) ${delay}ms`,
+        hidden.filter ? `filter 0.7s ease ${delay}ms` : "",
+      ].filter(Boolean).join(", "),
     }}>
       {children}
     </div>
@@ -228,7 +248,7 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
         {(["signup", "login"] as Mode[]).map(m => (
           <button key={m} onClick={() => { setMode(m); setError(null); setSuccess(null); }}
             className={clsx("flex-1 py-2 rounded-lg text-sm font-medium transition-colors",
-              mode === m ? "bg-green/15 text-green" : "text-muted hover:text-white")}>
+              mode === m ? "bg-red/15 text-red" : "text-muted hover:text-white")}>
             {m === "signup" ? "Get Started" : "Sign In"}
           </button>
         ))}
@@ -254,13 +274,13 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="flex items-center gap-2 bg-card2 border border-border rounded-xl px-3 py-2.5 focus-within:border-green/40 transition-colors">
+        <div className="flex items-center gap-2 bg-card2 border border-border rounded-xl px-3 py-2.5 focus-within:border-purple/50 transition-colors">
           <Mail size={13} className="text-muted flex-shrink-0" />
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="your@email.com" autoComplete="email"
             className="flex-1 bg-transparent text-sm text-white placeholder-muted focus:outline-none" />
         </div>
-        <div className="flex items-center gap-2 bg-card2 border border-border rounded-xl px-3 py-2.5 focus-within:border-green/40 transition-colors">
+        <div className="flex items-center gap-2 bg-card2 border border-border rounded-xl px-3 py-2.5 focus-within:border-purple/50 transition-colors">
           <Lock size={13} className="text-muted flex-shrink-0" />
           <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
             placeholder={mode === "signup" ? "Min 8 characters" : "Password"}
@@ -283,7 +303,7 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
           </div>
         )}
         <button type="submit" disabled={loading}
-          className="w-full bg-green/15 hover:bg-green/25 disabled:opacity-50 border border-green/30 text-green rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+          className="w-full bg-red/15 hover:bg-red/25 disabled:opacity-50 border border-red/40 text-red rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2">
           {loading
             ? <><Loader2 size={14} className="animate-spin" />{mode === "login" ? "Signing in..." : "Creating account..."}</>
             : mode === "login" ? "Sign In" : "Create Free Account"}
@@ -292,7 +312,7 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
       <p className="text-center text-[11px] text-muted mt-3">
         {mode === "signup" ? "Already have an account? " : "No account yet? "}
         <button onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setError(null); }}
-          className="text-green hover:underline">
+          className="text-red hover:underline">
           {mode === "signup" ? "Sign in" : "Sign up free"}
         </button>
       </p>
@@ -313,35 +333,50 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
 
 function TerminalShot() {
   const ref = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    function onScroll() {
+    let rafId = 0;
+    let ticking = false;
+
+    function apply() {
+      ticking = false;
       const el = ref.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
       const center = r.top + r.height / 2 - window.innerHeight / 2;
-      setOffset(Math.max(-36, Math.min(36, -center * 0.055)));
+      // The screenshot lies back below the fold and stands upright as it
+      // reaches center — a scroll-scrubbed 3D reveal, not a slide.
+      const tilt = Math.max(-4, Math.min(14, center * 0.02));
+      const lift = Math.max(-30, Math.min(30, -center * 0.04));
+      el.style.transform = `perspective(1400px) rotateX(${tilt}deg) translateY(${lift}px)`;
+    }
+
+    function onScroll() {
+      if (!ticking) { ticking = true; rafId = requestAnimationFrame(apply); }
     }
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    apply();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
   }, []);
 
   return (
     <section className="relative z-10 px-6 md:px-8 py-20 max-w-6xl mx-auto">
-      <FadeIn direction="up">
+      <FadeIn direction="blur">
         <div className="text-center mb-12">
-          <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="The terminal" /></p>
+          <p className="font-mono text-[11px] tracking-[0.28em] text-red uppercase mb-3"><GlitchText text="The terminal" /></p>
           <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
             Where the verdicts <span className="text-gradient-signal">land.</span>
           </h2>
         </div>
       </FadeIn>
-      <div ref={ref} className="relative will-change-transform" style={{ transform: `translateY(${offset}px)` }}>
-        <div className="absolute -inset-6 rounded-3xl blur-3xl opacity-25 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.28), transparent 70%)" }} />
+      <div ref={ref} className="relative will-change-transform" style={{ transformStyle: "preserve-3d" }}>
+        {/* Dual glow — heat from the left, signal from the right */}
+        <div className="absolute -inset-6 rounded-3xl blur-3xl opacity-30 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 18% 60%, rgba(255,61,92,0.25), transparent 60%), radial-gradient(ellipse at 82% 40%, rgba(124,92,255,0.25), transparent 60%)" }} />
         <BrowserFrame
           src="/screenshots/dashboard.png"
           alt="StockWiz dashboard - candlestick charts, screener signals, and streaming AI analysis"
@@ -381,8 +416,9 @@ export default function LandingPage() {
       {/* ── NAV — glass bar with live market pulse ── */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-green/15 border border-green/20 flex items-center justify-center">
-            <TrendingUp size={16} className="text-green" />
+          <div className="w-8 h-8 rounded-xl border flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, rgba(255,61,92,0.16), rgba(124,92,255,0.16))", borderColor: "rgba(255,61,92,0.25)" }}>
+            <TrendingUp size={16} className="text-red" />
           </div>
           <span className="text-white font-bold text-lg tracking-tight">StockWiz</span>
         </div>
@@ -395,10 +431,15 @@ export default function LandingPage() {
             <ScrambleLink label="Track record" href="#track-record" className="hover:text-white transition-colors" />
             <ScrambleLink label="Pricing" href="#pricing" className="hover:text-white transition-colors" />
           </div>
-          <button onClick={scrollToAuth}
-            className="flex items-center gap-2 bg-green/10 hover:bg-green/20 border border-green/30 text-green rounded-xl px-4 py-2 text-sm font-semibold transition-all">
-            Get Started <ArrowRight size={14} />
-          </button>
+          <Magnetic strength={0.25}>
+            <button onClick={scrollToAuth}
+              className="flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-semibold transition-all text-white hover:text-black"
+              style={{ borderColor: "rgba(255,61,92,0.4)", background: "rgba(255,61,92,0.1)" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "linear-gradient(90deg, #FF3D5C, #FF7A3D)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,61,92,0.1)"; }}>
+              Get Started <ArrowRight size={14} />
+            </button>
+          </Magnetic>
         </div>
       </nav>
 
@@ -418,8 +459,8 @@ export default function LandingPage() {
             live canvas field mounts over it as progressive enhancement */}
         <div id="ticker-field-root" aria-hidden className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 landing-grid-texture" />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 55% at 50% 118%, rgba(46,230,168,0.09), transparent 65%)" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 45% 35% at 88% -8%, rgba(128,85,245,0.08), transparent 60%)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 55% at 50% 118%, rgba(255,61,92,0.09), transparent 65%)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 45% 35% at 88% -8%, rgba(124,92,255,0.09), transparent 60%)" }} />
           <TickerField onIgnite={setIgnited} className="absolute inset-0 w-full h-full" />
         </div>
 
@@ -431,8 +472,8 @@ export default function LandingPage() {
           <FadeIn direction="up">
             <div className="inline-flex items-center gap-2.5 border border-white/10 bg-white/[0.03] rounded-full px-4 py-1.5 font-mono text-[11px] tracking-[0.18em] text-white/60 uppercase mb-10 backdrop-blur-sm">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-60" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red opacity-60" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red" />
               </span>
               Live · reading 5,700 tickers
             </div>
@@ -442,7 +483,7 @@ export default function LandingPage() {
               the judgment lands in Space Grotesk with a drifting signal
               gradient. */}
           <h1 className="mb-8">
-            <span className="block font-mono text-xl md:text-2xl tracking-[0.28em] text-white/55 uppercase mb-5" aria-label="5,700 stocks.">
+            <span className="block font-mono text-xl md:text-2xl tracking-[0.28em] text-red uppercase mb-5" aria-label="5,700 stocks.">
               {"5,700 stocks.".split("").map((ch, i) => (
                 <span key={i} aria-hidden className="reveal-char" style={{ "--ci": i } as React.CSSProperties}>
                   {ch === " " ? "\u00A0" : ch}
@@ -450,12 +491,17 @@ export default function LandingPage() {
               ))}
             </span>
             <span className="block font-display font-bold tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
-              <span aria-hidden className="reveal-char text-white" style={{ "--ci": 15 } as React.CSSProperties}>One{"\u00A0"}</span>
-              <span aria-hidden className="reveal-char text-gradient-signal" style={{ "--ci": 18 } as React.CSSProperties}>verdict.</span>
+              {/* The judgment rises out of a clipped slot, shearing upright */}
+              <span aria-hidden className="reveal-line">
+                <span style={{ "--ld": "480ms" } as React.CSSProperties}>
+                  <span className="text-white">One{"\u00A0"}</span>
+                  <span className="text-gradient-signal">verdict.</span>
+                </span>
+              </span>
             </span>
           </h1>
 
-          <FadeIn direction="up" delay={340}>
+          <FadeIn direction="blur" delay={340}>
             <p className="text-white/55 text-base md:text-lg leading-relaxed max-w-xl mb-10">
               Live market data, your rules, and <span className="text-purple">Claude reasoning</span> over
               every position — in plain English, as it streams.
@@ -466,12 +512,16 @@ export default function LandingPage() {
             <div className="flex items-center justify-center gap-5 flex-wrap">
               <Magnetic>
                 <button onClick={scrollToAuth}
-                  className="flex items-center gap-2 bg-green text-bg rounded-xl px-7 py-3.5 text-sm font-bold hover:bg-green/90 transition-colors shadow-lg shadow-green/20">
+                  className="flex items-center gap-2 text-black rounded-xl px-7 py-3.5 text-sm font-bold transition-all hover:brightness-110"
+                  style={{
+                    background: "linear-gradient(90deg, #FF3D5C, #FF7A3D)",
+                    boxShadow: "0 8px 32px rgba(255,61,92,0.35)",
+                  }}>
                   Start for free <ArrowRight size={15} />
                 </button>
               </Magnetic>
               <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-                className="flex items-center gap-2 font-mono text-xs tracking-wider text-muted hover:text-white uppercase transition-colors">
+                className="flex items-center gap-2 font-mono text-xs tracking-wider text-muted hover:text-red uppercase transition-colors">
                 How a verdict gets made <ChevronRight size={13} />
               </button>
             </div>
@@ -508,53 +558,64 @@ export default function LandingPage() {
       {/* ── TRACK RECORD — real public scoreboard, honest by design ── */}
       <TrackRecordLedger />
 
-      {/* ── INSTRUMENTS — capability grid, deliberately quiet ── */}
+      {/* ── INSTRUMENTS — capability grid; cards deal in from alternating
+             angles and carry a pointer-tracked spotlight in heat or signal ── */}
       <section className="relative z-10 px-8 py-16 max-w-7xl mx-auto">
-        <FadeIn direction="up">
+        <FadeIn direction="blur">
           <div className="text-center mb-12">
-            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="Instruments" /></p>
+            <p className="font-mono text-[11px] tracking-[0.28em] text-purple uppercase mb-3"><GlitchText text="Instruments" /></p>
             <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
-              Six instruments, <span className="text-gradient-signal">one terminal.</span>
+              Six instruments, <span className="text-gradient-heat">one terminal.</span>
             </h2>
           </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { icon: <Bot size={17}/>,         title: "AI Stock Analysis",       desc: "Claude AI analyzes every stock with live data injected — grounded in real numbers, not generic advice.", delay: 0 },
-            { icon: <Zap size={17}/>,         title: "Natural Language Search", desc: "Ask 'profitable tech stocks under PE 25' and get a filtered list back in seconds.", delay: 60 },
-            { icon: <BarChart2 size={17}/>,   title: "Volume Profile Chart",    desc: "Real historical volume by price level — identifies support and resistance, not fake order book data.", delay: 120 },
-            { icon: <TrendingUp size={17}/>,  title: "Portfolio P&L",           desc: "Track your real gains with auto-lookup of historical buy prices and AI sell signals.", delay: 0 },
-            { icon: <ShieldCheck size={17}/>, title: "Custom Criteria",         desc: "Define your own buy/watch/sell rules visually. Changes apply to your screener immediately.", delay: 60 },
-            { icon: <Star size={17}/>,        title: "90-Day Prediction",       desc: "Bull/base/bear price projections generated by Claude from recent momentum and fundamentals.", delay: 120 },
-          ].map(({ icon, title, desc, delay }) => (
-            <FadeIn key={title} direction="up" delay={delay}>
-              <Tilt>
-                <div className="glass-card border border-white/[0.07] rounded-2xl p-5 hover:border-green/25 transition-colors group h-full">
-                  <div className="w-9 h-9 rounded-xl bg-green/10 border border-green/20 flex items-center justify-center mb-4 text-green group-hover:bg-green/15 transition-colors">
-                    {icon}
-                  </div>
-                  <p className="font-mono text-xs tracking-[0.12em] uppercase text-white mb-2">{title}</p>
-                  <p className="text-muted text-xs leading-relaxed">{desc}</p>
-                </div>
-              </Tilt>
-            </FadeIn>
-          ))}
+            { icon: <Bot size={17}/>,         title: "AI Stock Analysis",       desc: "Claude AI analyzes every stock with live data injected — grounded in real numbers, not generic advice." },
+            { icon: <Zap size={17}/>,         title: "Natural Language Search", desc: "Ask 'profitable tech stocks under PE 25' and get a filtered list back in seconds." },
+            { icon: <BarChart2 size={17}/>,   title: "Volume Profile Chart",    desc: "Real historical volume by price level — identifies support and resistance, not fake order book data." },
+            { icon: <TrendingUp size={17}/>,  title: "Portfolio P&L",           desc: "Track your real gains with auto-lookup of historical buy prices and AI sell signals." },
+            { icon: <ShieldCheck size={17}/>, title: "Custom Criteria",         desc: "Define your own buy/watch/sell rules visually. Changes apply to your screener immediately." },
+            { icon: <Star size={17}/>,        title: "90-Day Prediction",       desc: "Bull/base/bear price projections generated by Claude from recent momentum and fundamentals." },
+          ].map(({ icon, title, desc }, i) => {
+            // Column position decides the entrance angle and the accent voice
+            const col = i % 3;
+            const entrance: ("tilt-left" | "zoom" | "tilt-right")[] = ["tilt-left", "zoom", "tilt-right"];
+            const heat = i % 2 === 0;
+            const accent = heat ? "#FF5C7A" : "#8055F5";
+            const spotColor = heat ? "rgba(255,61,92,0.12)" : "rgba(124,92,255,0.14)";
+            return (
+              <FadeIn key={title} direction={entrance[col]} delay={col * 80}>
+                <Tilt>
+                  <SpotlightCard color={spotColor} className="glass-card border border-white/[0.07] rounded-2xl p-5 transition-colors group h-full"
+                    >
+                    <div className="w-9 h-9 rounded-xl border flex items-center justify-center mb-4 transition-colors"
+                      style={{ color: accent, borderColor: `${accent}33`, background: `${accent}1A` }}>
+                      {icon}
+                    </div>
+                    <p className="font-mono text-xs tracking-[0.12em] uppercase text-white mb-2">{title}</p>
+                    <p className="text-muted text-xs leading-relaxed">{desc}</p>
+                  </SpotlightCard>
+                </Tilt>
+              </FadeIn>
+            );
+          })}
         </div>
       </section>
 
       {/* ── PRICING ── */}
       <section id="pricing" className="relative z-10 px-8 py-20 max-w-7xl mx-auto">
-        <FadeIn direction="up">
+        <FadeIn direction="blur">
           <div className="text-center mb-12">
-            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="Pricing" /></p>
+            <p className="font-mono text-[11px] tracking-[0.28em] text-sky uppercase mb-3"><GlitchText text="Pricing" /></p>
             <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
               Simple pricing, <span className="text-gradient-signal">no surprises.</span>
             </h2>
           </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          <FadeIn direction="left" delay={0}>
-            <div className="bg-card border border-green/20 rounded-2xl p-6 h-full">
+          <FadeIn direction="flip" delay={0}>
+            <div className="bg-card rounded-2xl p-6 h-full" style={{ border: "1px solid rgba(255,61,92,0.28)" }}>
               <p className="text-white font-bold text-lg mb-1">Free</p>
               <p className="text-3xl font-mono font-black text-white mb-1">$0<span className="text-muted text-sm font-normal">/mo</span></p>
               <p className="font-mono text-[10px] tracking-wider text-muted uppercase mb-5">200K AI tokens/mo · own key = unlimited</p>
@@ -568,12 +629,13 @@ export default function LandingPage() {
                 ))}
               </div>
               <button onClick={scrollToAuth}
-                className="w-full bg-green/10 hover:bg-green/20 border border-green/30 text-green rounded-xl py-2.5 text-sm font-semibold transition-colors">
+                className="w-full text-black rounded-xl py-2.5 text-sm font-semibold transition-all hover:brightness-110"
+                style={{ background: "linear-gradient(90deg, #FF3D5C, #FF7A3D)" }}>
                 Get started free
               </button>
             </div>
           </FadeIn>
-          <FadeIn direction="right" delay={100}>
+          <FadeIn direction="flip" delay={140}>
             <div className="bg-card border border-border/40 rounded-2xl p-6 h-full relative overflow-hidden">
               <div className="absolute top-4 right-4 bg-purple/20 text-purple-300 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple/30">Coming soon</div>
               <p className="text-white font-bold text-lg mb-1">Pro</p>
@@ -596,8 +658,12 @@ export default function LandingPage() {
 
       {/* ── CTA + AUTH — the noise returns, quietly, behind the form ── */}
       <section ref={authRef} className="relative z-10 px-8 py-20 max-w-7xl mx-auto">
-        <FadeIn direction="up">
-          <div className="relative overflow-hidden bg-gradient-to-br from-green/8 to-purple-500/5 border border-green/15 rounded-3xl px-8 py-14 text-center">
+        <FadeIn direction="zoom">
+          <div className="relative overflow-hidden rounded-3xl px-8 py-14 text-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,61,92,0.07), rgba(10,6,10,0.4) 45%, rgba(124,92,255,0.09))",
+              border: "1px solid rgba(255,61,92,0.18)",
+            }}>
             <div aria-hidden className="absolute inset-0 landing-grid-texture opacity-50 pointer-events-none" />
             {/* The wire terrain bows away from the cursor behind the form */}
             <WireTerrain className="absolute inset-0" />
@@ -617,8 +683,8 @@ export default function LandingPage() {
         </FadeIn>
       </section>
 
-      {/* ── THE TAPE, again — bookend ── */}
-      <TickerTape />
+      {/* ── THE TAPE, again — but hot: the editorial red band ── */}
+      <TickerTape hot />
 
       </VelocityWarp>
 
@@ -627,8 +693,9 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-5">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-green/15 flex items-center justify-center">
-                <TrendingUp size={12} className="text-green" />
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, rgba(255,61,92,0.16), rgba(124,92,255,0.16))" }}>
+                <TrendingUp size={12} className="text-red" />
               </div>
               <span className="text-white font-semibold text-sm">StockWiz</span>
             </div>

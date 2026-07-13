@@ -37,13 +37,46 @@ export default function TypeWall() {
       const r = section!.getBoundingClientRect();
       const vh = window.innerHeight;
       // 0 when the section's top enters the viewport bottom, 1 when its
-      // bottom leaves the top — the row slide is scrubbed by this.
+      // bottom leaves the top — row slide AND the ignite sweep scrub off this.
       const p = Math.max(0, Math.min(1, (vh - r.top) / (vh + r.height)));
       const drift = (p - 0.5) * 34; // total % of row width traversed
+
+      // Pass 1: slide the rows (writes)
       rowRefs.current.forEach((row, i) => {
         if (!row) return;
-        const dir = ROWS[i].dir;
-        row.style.transform = `translateX(${-18 + drift * dir}%)`;
+        row.style.transform = `translateX(${-18 + drift * ROWS[i].dir}%)`;
+      });
+
+      // Pass 2: light the word nearest a target that travels across the
+      // viewport with scroll — always on-screen, no cursor required.
+      // Rows alternate travel direction so the lit words counter-sweep.
+      const vw = window.innerWidth;
+      rowRefs.current.forEach((row, i) => {
+        if (!row) return;
+        const { color, glow, dir } = ROWS[i];
+        const targetX = dir === 1
+          ? vw * (0.18 + 0.64 * p)
+          : vw * (0.82 - 0.64 * p);
+        const words = row.children;
+        let lit = 0;
+        let best = Infinity;
+        for (let k = 0; k < words.length; k++) {
+          const wr = (words[k] as HTMLElement).getBoundingClientRect();
+          const d = Math.abs(wr.left + wr.width / 2 - targetX);
+          if (d < best) { best = d; lit = k; }
+        }
+        for (let k = 0; k < words.length; k++) {
+          const w = words[k] as HTMLElement;
+          if (k === lit) {
+            w.style.color = color;
+            w.style.webkitTextStroke = `1.5px ${color}`;
+            w.style.textShadow = `0 0 42px ${glow}`;
+          } else {
+            w.style.color = "transparent";
+            w.style.webkitTextStroke = "1.5px rgba(255,255,255,0.14)";
+            w.style.textShadow = "none";
+          }
+        }
       });
     }
 

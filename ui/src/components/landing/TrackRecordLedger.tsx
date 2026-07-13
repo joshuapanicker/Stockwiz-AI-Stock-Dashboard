@@ -81,9 +81,9 @@ export default function TrackRecordLedger() {
         }}
       >
         <div className="text-center mb-4">
-          <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Track record</p>
+          <p className="font-mono text-[11px] tracking-[0.28em] text-orange uppercase mb-3">Track record</p>
           <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
-            The AI grades <span className="text-gradient-signal">its own calls.</span>
+            The AI grades <span className="text-gradient-heat">its own calls.</span>
           </h2>
           <p className="text-white/55 text-sm md:text-base mt-5 max-w-xl mx-auto leading-relaxed">
             Inside the app, Claude issues buy and sell verdicts on real stocks.

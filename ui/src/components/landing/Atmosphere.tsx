@@ -119,8 +119,9 @@ export function DataConstellation() {
           const dx = a.x - b.x, dy = a.y - b.y;
           const d2 = dx * dx + dy * dy;
           if (d2 < 120 * 120) {
-            const alpha = (1 - Math.sqrt(d2) / 120) * 0.05;
-            ctx!.strokeStyle = `rgba(46,230,168,${alpha})`;
+            // The noise is red; the connections it forms are signal-violet
+            const alpha = (1 - Math.sqrt(d2) / 120) * 0.055;
+            ctx!.strokeStyle = `rgba(124,92,255,${alpha})`;
             ctx!.lineWidth = 0.6;
             ctx!.beginPath();
             ctx!.moveTo(a.x, a.y);
@@ -132,8 +133,8 @@ export function DataConstellation() {
 
       for (const d of dots) {
         ctx!.fillStyle = d.violet
-          ? "rgba(128,85,245,0.22)"
-          : "rgba(46,230,168,0.18)";
+          ? "rgba(124,92,255,0.22)"
+          : "rgba(255,61,92,0.16)";
         ctx!.beginPath();
         ctx!.arc(d.x, d.y, d.r, 0, Math.PI * 2);
         ctx!.fill();
@@ -170,10 +171,10 @@ export function DataConstellation() {
 
 type RGB = [number, number, number];
 const WASH_STOPS: { top: RGB; corner: RGB }[] = [
-  { top: [46, 230, 168],  corner: [128, 85, 245] },  // hero — signal teal / violet
-  { top: [128, 85, 245],  corner: [63, 167, 252] },  // pipeline — violet / sky
-  { top: [255, 172, 38],  corner: [255, 92, 122] },  // verdict wall — amber / red
-  { top: [46, 230, 168],  corner: [128, 85, 245] },  // ledger + CTA — home again
+  { top: [255, 61, 92],   corner: [124, 92, 255] },  // hero — heat / signal
+  { top: [124, 92, 255],  corner: [63, 167, 252] },  // pipeline — violet / sky
+  { top: [255, 122, 61],  corner: [255, 61, 92] },   // verdict wall — full heat
+  { top: [124, 92, 255],  corner: [255, 61, 92] },   // ledger + CTA — both voices
 ];
 
 function lerpRGB(a: RGB, b: RGB, t: number): RGB {
@@ -225,9 +226,9 @@ export function AmbientWashes() {
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden>
       <div ref={topRef} className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.07) 0%, transparent 60%)" }} />
+        style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,61,92,0.07) 0%, transparent 60%)" }} />
       <div ref={cornerRef} className="absolute inset-0"
-        style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.06) 0%, transparent 55%)" }} />
+        style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(124,92,255,0.06) 0%, transparent 55%)" }} />
     </div>
   );
 }
@@ -279,7 +280,7 @@ export function CursorGlow() {
       aria-hidden
       className="fixed top-0 left-0 w-[520px] h-[520px] pointer-events-none z-[15] opacity-0 transition-opacity duration-700"
       style={{
-        background: "radial-gradient(circle, rgba(46,230,168,0.07) 0%, rgba(128,85,245,0.035) 40%, transparent 68%)",
+        background: "radial-gradient(circle, rgba(255,61,92,0.065) 0%, rgba(124,92,255,0.04) 40%, transparent 68%)",
         mixBlendMode: "screen",
         willChange: "transform",
       }}
@@ -312,7 +313,7 @@ export function ScrollProgress() {
         className="h-full w-full origin-left"
         style={{
           transform: "scaleX(0)",
-          background: "linear-gradient(90deg, #2EE6A8, #8055F5)",
+          background: "linear-gradient(90deg, #FF3D5C, #FF7A3D 45%, #7C5CFF)",
           willChange: "transform",
         }}
       />
@@ -333,7 +334,7 @@ const TAPE_SEED: [string, number, number][] = [
   ["CVX", 152.6, -0.51], ["INTC", 21.5, 0.91], ["BA", 178.3, -1.1],
 ];
 
-export function TickerTape() {
+export function TickerTape({ hot = false }: { hot?: boolean } = {}) {
   const [rows, setRows] = useState(TAPE_SEED);
 
   useEffect(() => {
@@ -364,6 +365,23 @@ export function TickerTape() {
   }, []);
 
   const items = [...rows, ...rows]; // doubled for the -50% loop
+
+  if (hot) {
+    // The editorial band — solid heat, black type, unapologetic
+    return (
+      <div className="ticker-tape ticker-tape-hot relative z-10 overflow-hidden py-3 select-none" aria-hidden>
+        <div className="ticker-tape-track">
+          {items.map(([sym, price, chg], i) => (
+            <span key={`${sym}-${i}`} className="inline-flex items-baseline gap-2 px-6 font-mono text-xs font-bold tracking-wider text-black">
+              <span>{sym}</span>
+              <span className="opacity-60">${price.toFixed(2)}</span>
+              <span>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}%</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ticker-tape relative z-10 border-y border-white/[0.06] bg-white/[0.015] overflow-hidden py-2.5 select-none" aria-hidden>

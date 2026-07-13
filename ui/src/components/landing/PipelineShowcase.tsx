@@ -308,7 +308,7 @@ export default function PipelineShowcase() {
 
   const header = (
     <div className="text-center mb-4">
-      <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">The pipeline</p>
+      <p className="font-mono text-[11px] tracking-[0.28em] text-sky uppercase mb-3">The pipeline</p>
       <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
         How a verdict <span className="text-gradient-signal">gets made.</span>
       </h2>

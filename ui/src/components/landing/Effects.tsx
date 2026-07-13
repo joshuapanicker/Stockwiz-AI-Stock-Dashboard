@@ -73,6 +73,30 @@ export function ScrambleLink({ label, href, className = "" }: {
   );
 }
 
+// ── Spotlight card — a lens follows the pointer inside the card ────────────
+
+export function SpotlightCard({ children, color, className = "" }: {
+  children: React.ReactNode; color?: string; className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  function onMove(e: React.MouseEvent) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
+
+  return (
+    <div ref={ref} onMouseMove={onMove}
+      className={`spot-card ${className}`}
+      style={color ? ({ "--spot-color": color } as React.CSSProperties) : undefined}>
+      {children}
+    </div>
+  );
+}
+
 // ── Scroll-velocity warp ───────────────────────────────────────────────────
 
 export function VelocityWarp({ children }: { children: React.ReactNode }) {

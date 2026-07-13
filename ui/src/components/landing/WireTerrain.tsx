@@ -77,8 +77,15 @@ export default function WireTerrain({ className = "" }: { className?: string }) 
         // Proximity of this line to the cursor column, 0..1
         const colNear = Math.exp(-(dxm * dxm) / (2 * 190 * 190));
 
+        // Dualistic field: heat on the left, signal on the right,
+        // blending through the middle
+        const mix = baseX / W;
+        const cr = Math.round(255 + (124 - 255) * mix);
+        const cg = Math.round(61 + (92 - 61) * mix);
+        const cb = Math.round(92 + (255 - 92) * mix);
+
         ctx!.beginPath();
-        ctx!.strokeStyle = `rgba(46,230,168,${0.05 + colNear * 0.22})`;
+        ctx!.strokeStyle = `rgba(${cr},${cg},${cb},${0.06 + colNear * 0.24})`;
         ctx!.lineWidth = 1;
 
         for (let y = -step; y <= H + step; y += step) {
