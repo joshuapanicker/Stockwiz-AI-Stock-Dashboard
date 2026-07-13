@@ -24,6 +24,11 @@ export default {
         // Futura's proportions (Futura/Greycliff/Monopoly aren't licensed
         // for free web embedding).
         display: ['"Jost"', "Inter", "system-ui", "sans-serif"],
+        // Hero headline combo (campaign-poster reference): a heavy grotesque
+        // for the connective word, a high-contrast display serif for the
+        // impact word.
+        "headline-sans": ['"Archivo Black"', "Inter", "system-ui", "sans-serif"],
+        "headline-serif": ['"Playfair Display"', "Georgia", "serif"],
       },
     },
   },

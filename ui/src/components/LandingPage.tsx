@@ -503,11 +503,15 @@ export default function LandingPage() {
                 </span>
               ))}
             </span>
-            <span className="block font-display font-light tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
-              {/* The judgment rises out of a clipped slot, shearing upright */}
+            <span className="block uppercase tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
+              {/* The judgment rises out of a clipped slot, shearing upright.
+                  Campaign-poster combo: heavy grotesque for the connective
+                  word, high-contrast serif for the impact word \u2014 colors
+                  unchanged, still one continuous violet->blue gradient. */}
               <span aria-hidden className="reveal-line">
                 <span style={{ "--ld": "480ms" } as React.CSSProperties}>
-                  <span className="text-gradient-signal">One{"\u00A0"}verdict.</span>
+                  <span className="font-headline-sans text-gradient-signal">One{"\u00A0"}</span>
+                  <span className="font-headline-serif text-gradient-signal">verdict.</span>
                 </span>
               </span>
             </span>
