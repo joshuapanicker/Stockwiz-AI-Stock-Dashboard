@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "../../hooks/useApi";
+import TickerLogo from "../TickerLogo";
 
 /**
  * Page-wide atmosphere — the connective tissue that makes the landing feel
@@ -334,7 +335,7 @@ const TAPE_SEED: [string, number, number][] = [
   ["CVX", 152.6, -0.51], ["INTC", 21.5, 0.91], ["BA", 178.3, -1.1],
 ];
 
-export function TickerTape({ hot = false }: { hot?: boolean } = {}) {
+export function TickerTape({ hot = false, logos = false }: { hot?: boolean; logos?: boolean } = {}) {
   const [rows, setRows] = useState(TAPE_SEED);
 
   useEffect(() => {
@@ -387,7 +388,8 @@ export function TickerTape({ hot = false }: { hot?: boolean } = {}) {
     <div className="ticker-tape relative z-10 border-y border-white/[0.06] bg-white/[0.015] overflow-hidden py-2.5 select-none" aria-hidden>
       <div className="ticker-tape-track">
         {items.map(([sym, price, chg], i) => (
-          <span key={`${sym}-${i}`} className="inline-flex items-baseline gap-2 px-6 font-mono text-[11px] tracking-wider">
+          <span key={`${sym}-${i}`} className="inline-flex items-center gap-2 px-6 font-mono text-[11px] tracking-wider">
+            {logos && <TickerLogo symbol={sym} size={16} className="opacity-90" />}
             <span className="text-white/70 font-semibold">{sym}</span>
             <span className="text-white/40">${price.toFixed(2)}</span>
             <span className={chg >= 0 ? "text-green/80" : "text-red/80"}>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { IgnitedTicker } from "./TickerField";
+import TickerLogo from "../TickerLogo";
 
 /**
  * The glass verdict card — where an ignited ticker becomes a verdict.
@@ -145,8 +146,9 @@ export default function VerdictCard({ ticker, className = "" }: {
         </p>
 
         {/* Header — the ignited ticker */}
-        <div className="flex items-baseline justify-between anim-fade-in">
-          <span className="font-mono font-semibold text-white text-lg tracking-wide">
+        <div className="flex items-center justify-between anim-fade-in">
+          <span className="flex items-center gap-2.5 font-mono font-semibold text-white text-lg tracking-wide">
+            <TickerLogo symbol={ticker.symbol} size={26} />
             {ticker.symbol}
           </span>
           <span className="font-mono text-sm text-white/70">

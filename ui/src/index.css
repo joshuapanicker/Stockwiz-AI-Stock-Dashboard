@@ -68,6 +68,48 @@ body {
   .aurora-teal, .aurora-violet { animation: none; }
 }
 
+/* ── Custom cursor — hide the native pointer wherever the reticle runs ──
+   Text fields keep the native I-beam (the reticle fades itself out there,
+   see CustomCursor.tsx). Applied only when the component mounts, and the
+   component itself mounts only for fine pointers. */
+html.has-custom-cursor,
+html.has-custom-cursor * {
+  cursor: none !important;
+}
+html.has-custom-cursor input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]),
+html.has-custom-cursor textarea,
+html.has-custom-cursor [contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* ── Intro loader — the mark draws itself, the wordmark staggers in ── */
+@keyframes introDraw {
+  from { stroke-dashoffset: var(--len); }
+  to   { stroke-dashoffset: 0; }
+}
+.intro-draw {
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: introDraw 0.85s cubic-bezier(0.5, 0, 0.2, 1) both;
+}
+@keyframes introChar {
+  from { opacity: 0; transform: translateY(0.5em); }
+  to   { opacity: 1; transform: none; }
+}
+.intro-char {
+  display: inline-block;
+  opacity: 0;
+  animation: introChar 0.4s ease both;
+  animation-delay: calc(var(--ci) * 45ms + 650ms);
+}
+
+/* While the intro curtain is up, hero reveals hold at frame 0 so the page
+   animates in as the curtain lifts, not behind it. */
+.intro-hold .reveal-char,
+.intro-hold .reveal-line > * {
+  animation-play-state: paused !important;
+}
+
 /* ── Glass surfaces ── */
 .glass-card {
   background: rgba(255, 255, 255, 0.035);

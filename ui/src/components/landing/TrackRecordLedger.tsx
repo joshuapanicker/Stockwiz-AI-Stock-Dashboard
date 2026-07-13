@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { useTrackRecord, type TrackRecordCall } from "../../hooks/useApi";
 import { useInView } from "../../hooks/useInView";
+import TickerLogo from "../TickerLogo";
 
 /**
  * "We grade our own calls" — the trust section. Real data from the public
@@ -29,14 +30,17 @@ function LedgerRow({ call, index }: { call: TrackRecordCall; index: number }) {
   return (
     <div
       ref={ref}
-      className="grid grid-cols-[64px_88px_1fr_92px_72px_72px] items-center gap-2 px-4 py-2.5 border-b border-white/[0.05] font-mono text-xs"
+      className="grid grid-cols-[92px_88px_1fr_92px_72px_72px] items-center gap-2 px-4 py-2.5 border-b border-white/[0.05] font-mono text-xs"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? "none" : "translateY(10px)",
         transition: `opacity 0.4s ease ${index * 60}ms, transform 0.4s ease ${index * 60}ms`,
       }}
     >
-      <span className="text-white font-semibold">{call.symbol}</span>
+      <span className="flex items-center gap-2 text-white font-semibold">
+        <TickerLogo symbol={call.symbol} size={18} />
+        {call.symbol}
+      </span>
       <span
         className="inline-flex justify-center border rounded px-1.5 py-0.5 text-[9px] tracking-wider font-semibold"
         style={yes && buy
@@ -133,7 +137,7 @@ export default function TrackRecordLedger() {
 
         {/* The ledger */}
         <div className="border border-white/10 rounded-2xl overflow-hidden bg-white/[0.015]">
-          <div className="grid grid-cols-[64px_88px_1fr_92px_72px_72px] gap-2 px-4 py-2.5 border-b border-white/10 font-mono text-[9px] tracking-[0.18em] text-white/35 uppercase">
+          <div className="grid grid-cols-[92px_88px_1fr_92px_72px_72px] gap-2 px-4 py-2.5 border-b border-white/10 font-mono text-[9px] tracking-[0.18em] text-white/35 uppercase">
             <span>Sym</span><span className="text-center">Call</span><span>Basis</span>
             <span>At call</span><span className="text-right">30d</span><span className="text-right">vs SPY</span>
           </div>

@@ -97,6 +97,62 @@ export function SpotlightCard({ children, color, className = "" }: {
   );
 }
 
+// ── Scroll-fill text — outlined giant type that floods with color ──────────
+// Two stacked copies of the same line: an outline ghost underneath and a
+// gradient-filled copy on top, clipped by scroll progress so the fill pours
+// in from the left as the line crosses the viewport.
+
+export function ScrollFillText({ text, className = "" }: { text: string; className?: string }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const fillRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const fill = fillRef.current;
+    if (!wrap || !fill) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      fill.style.clipPath = "none"; // static: fully filled
+      return;
+    }
+
+    let rafId = 0;
+    let ticking = false;
+
+    function apply() {
+      ticking = false;
+      const r = wrap!.getBoundingClientRect();
+      const vh = window.innerHeight;
+      // Fill runs 0→1 while the line travels the middle 70% of the viewport
+      const p = Math.max(0, Math.min(1, (vh * 0.88 - r.top) / (vh * 0.7)));
+      fill!.style.clipPath = `inset(0 ${(1 - p) * 100}% 0 0)`;
+    }
+
+    function onScroll() {
+      if (!ticking) { ticking = true; rafId = requestAnimationFrame(apply); }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    apply();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <div ref={wrapRef} aria-hidden className={`relative select-none whitespace-nowrap ${className}`}>
+      <span className="block font-display font-black"
+        style={{ WebkitTextStroke: "1.5px rgba(255,255,255,0.16)", color: "transparent" }}>
+        {text}
+      </span>
+      <span ref={fillRef} className="absolute inset-0 block font-display font-black text-gradient-heat"
+        style={{ clipPath: "inset(0 100% 0 0)" }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
 // ── Scroll-velocity warp ───────────────────────────────────────────────────
 
 export function VelocityWarp({ children }: { children: React.ReactNode }) {
