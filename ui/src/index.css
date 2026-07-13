@@ -153,6 +153,56 @@ body {
   .ticker-tape-track { animation: none; }
 }
 
+/* ── Terminal glitch — brief chromatic bursts every few seconds ──────────
+   Two offset copies (teal + violet) flash in for a few frames with hard
+   clip-path slices, then vanish. Idle ~93% of the loop so it reads as a
+   signal artifact, not a strobe. */
+.glitch {
+  position: relative;
+  display: inline-block;
+}
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.glitch::before {
+  color: #2EE6A8;
+  animation: glitchSliceA 5.2s steps(1) infinite;
+}
+.glitch::after {
+  color: #B9A6FF;
+  animation: glitchSliceB 5.2s steps(1) 0.05s infinite;
+}
+@keyframes glitchSliceA {
+  0%, 100%  { opacity: 0; transform: none; clip-path: none; }
+  92%       { opacity: 0.85; transform: translate(-2px, 1px);  clip-path: inset(8% 0 58% 0); }
+  93.4%     { opacity: 0.85; transform: translate(2px, -1px);  clip-path: inset(52% 0 12% 0); }
+  94.8%     { opacity: 0; transform: none; clip-path: none; }
+}
+@keyframes glitchSliceB {
+  0%, 100%  { opacity: 0; transform: none; clip-path: none; }
+  92%       { opacity: 0.75; transform: translate(2px, -1px);  clip-path: inset(45% 0 28% 0); }
+  93.4%     { opacity: 0.75; transform: translate(-2px, 1px);  clip-path: inset(12% 0 66% 0); }
+  94.8%     { opacity: 0; transform: none; clip-path: none; }
+}
+
+/* ── Verdict wall — words ignite to their verdict color on hover ── */
+.typewall-word:hover {
+  color: var(--ignite-color) !important;
+  -webkit-text-stroke: 1.5px var(--ignite-color) !important;
+  text-shadow: 0 0 48px var(--ignite-glow) !important;
+}
+.typewall-row { cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch::before, .glitch::after { animation: none; opacity: 0; }
+  .typewall-word, .typewall-word:hover { transition: none; }
+}
+
 /* Terminal price flicker — discrete brightness steps, not a smooth fade */
 @keyframes pipelineFlicker {
   0%, 100% { opacity: 1; }

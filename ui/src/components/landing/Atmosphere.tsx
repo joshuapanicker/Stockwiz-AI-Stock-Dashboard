@@ -49,6 +49,8 @@ export function DataConstellation() {
     let lastDraw = 0;
     let lastScrollY = window.scrollY;
     let scrollKick = 0;
+    // Pointer parked far off-screen until it moves
+    let mx = -9999, my = -9999;
 
     function resize() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -77,6 +79,11 @@ export function DataConstellation() {
       lastScrollY = y;
     }
 
+    function onPointer(e: PointerEvent) {
+      mx = e.clientX;
+      my = e.clientY;
+    }
+
     function tick(now: number) {
       if (disposed) return;
       rafId = requestAnimationFrame(tick);
@@ -88,6 +95,15 @@ export function DataConstellation() {
       scrollKick *= 0.9; // settle
 
       for (const d of dots) {
+        // The pointer repels nearby dots — the field parts around the cursor
+        const pdx = d.x - mx, pdy = d.y - my;
+        const pd2 = pdx * pdx + pdy * pdy;
+        if (pd2 < 130 * 130 && pd2 > 0.01) {
+          const pd = Math.sqrt(pd2);
+          const f = ((130 - pd) / 130) * 0.35;
+          d.x += (pdx / pd) * f;
+          d.y += (pdy / pd) * f;
+        }
         d.x += d.vx;
         d.y += d.vy - scrollKick;
         if (d.y < -10) { d.y = H + 10; d.x = Math.random() * W; }
@@ -127,6 +143,7 @@ export function DataConstellation() {
     resize();
     window.addEventListener("resize", resize);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pointermove", onPointer, { passive: true });
     rafId = requestAnimationFrame(tick);
 
     return () => {
@@ -134,6 +151,7 @@ export function DataConstellation() {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pointermove", onPointer);
     };
   }, []);
 
@@ -143,6 +161,74 @@ export function DataConstellation() {
       aria-hidden
       className="fixed inset-0 pointer-events-none z-0"
     />
+  );
+}
+
+// ── Ambient washes — the page's color journey, scrubbed by scroll ──────────
+// Two fixed radial washes whose colors travel teal → violet → amber → teal
+// as you move down the page, so each act of the story has its own cast.
+
+type RGB = [number, number, number];
+const WASH_STOPS: { top: RGB; corner: RGB }[] = [
+  { top: [46, 230, 168],  corner: [128, 85, 245] },  // hero — signal teal / violet
+  { top: [128, 85, 245],  corner: [63, 167, 252] },  // pipeline — violet / sky
+  { top: [255, 172, 38],  corner: [255, 92, 122] },  // verdict wall — amber / red
+  { top: [46, 230, 168],  corner: [128, 85, 245] },  // ledger + CTA — home again
+];
+
+function lerpRGB(a: RGB, b: RGB, t: number): RGB {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+export function AmbientWashes() {
+  const topRef = useRef<HTMLDivElement>(null);
+  const cornerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let rafId = 0;
+    let ticking = false;
+
+    function apply() {
+      ticking = false;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const p = max > 0 ? Math.max(0, Math.min(1, window.scrollY / max)) : 0;
+      const seg = p * (WASH_STOPS.length - 1);
+      const i = Math.min(WASH_STOPS.length - 2, Math.floor(seg));
+      const t = seg - i;
+      const top = lerpRGB(WASH_STOPS[i].top, WASH_STOPS[i + 1].top, t);
+      const corner = lerpRGB(WASH_STOPS[i].corner, WASH_STOPS[i + 1].corner, t);
+      if (topRef.current) {
+        topRef.current.style.background =
+          `radial-gradient(ellipse 80% 50% at 50% -10%, rgba(${top[0] | 0},${top[1] | 0},${top[2] | 0},0.07) 0%, transparent 60%)`;
+      }
+      if (cornerRef.current) {
+        cornerRef.current.style.background =
+          `radial-gradient(ellipse 50% 40% at 100% 70%, rgba(${corner[0] | 0},${corner[1] | 0},${corner[2] | 0},0.06) 0%, transparent 55%)`;
+      }
+    }
+
+    function onScroll() {
+      if (!ticking) {
+        ticking = true;
+        rafId = requestAnimationFrame(apply);
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    apply();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden>
+      <div ref={topRef} className="absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.07) 0%, transparent 60%)" }} />
+      <div ref={cornerRef} className="absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.06) 0%, transparent 55%)" }} />
+    </div>
   );
 }
 

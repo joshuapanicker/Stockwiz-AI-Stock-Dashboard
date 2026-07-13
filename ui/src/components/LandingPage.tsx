@@ -13,7 +13,10 @@ import TickerField, { type IgnitedTicker } from "./landing/TickerField";
 import VerdictCard from "./landing/VerdictCard";
 import PipelineShowcase from "./landing/PipelineShowcase";
 import TrackRecordLedger from "./landing/TrackRecordLedger";
-import { DataConstellation, CursorGlow, ScrollProgress, TickerTape } from "./landing/Atmosphere";
+import TypeWall from "./landing/TypeWall";
+import WireTerrain from "./landing/WireTerrain";
+import { GlitchText, ScrambleLink, VelocityWarp } from "./landing/Effects";
+import { DataConstellation, CursorGlow, ScrollProgress, TickerTape, AmbientWashes } from "./landing/Atmosphere";
 
 // ── 3D tilt on hover — cards lean toward the cursor ───────────────────────
 
@@ -330,7 +333,7 @@ function TerminalShot() {
     <section className="relative z-10 px-6 md:px-8 py-20 max-w-6xl mx-auto">
       <FadeIn direction="up">
         <div className="text-center mb-12">
-          <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">The terminal</p>
+          <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="The terminal" /></p>
           <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
             Where the verdicts <span className="text-gradient-signal">land.</span>
           </h2>
@@ -366,13 +369,11 @@ export default function LandingPage() {
     <div className="min-h-screen text-white" style={{ background: "#06080D" }}>
       <style>{`body { overflow-x: hidden; }`}</style>
 
-      {/* Page-wide atmosphere: quiet washes + the data constellation that
-          runs behind every section, the cursor lens that follows the
-          pointer everywhere, and the scroll progress hairline. */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.07) 0%, transparent 60%)" }} />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.06) 0%, transparent 55%)" }} />
-      </div>
+      {/* Page-wide atmosphere: scroll-hue washes + the data constellation
+          that runs behind every section, the cursor lens that follows the
+          pointer everywhere, and the scroll progress hairline. The washes
+          travel teal → violet → amber → teal as you move down the page. */}
+      <AmbientWashes />
       <DataConstellation />
       <CursorGlow />
       <ScrollProgress />
@@ -389,10 +390,10 @@ export default function LandingPage() {
           <MicroTicker />
         </div>
         <div className="flex items-center gap-8">
-          <div className="hidden md:flex items-center gap-8 text-sm text-muted">
-            <a href="#features" className="hover:text-white transition-colors">Pipeline</a>
-            <a href="#track-record" className="hover:text-white transition-colors">Track record</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          <div className="hidden md:flex items-center gap-8 text-sm text-muted font-mono">
+            <ScrambleLink label="Pipeline" href="#features" className="hover:text-white transition-colors" />
+            <ScrambleLink label="Track record" href="#track-record" className="hover:text-white transition-colors" />
+            <ScrambleLink label="Pricing" href="#pricing" className="hover:text-white transition-colors" />
           </div>
           <button onClick={scrollToAuth}
             className="flex items-center gap-2 bg-green/10 hover:bg-green/20 border border-green/30 text-green rounded-xl px-4 py-2 text-sm font-semibold transition-all">
@@ -400,6 +401,11 @@ export default function LandingPage() {
           </button>
         </div>
       </nav>
+
+      {/* Everything below the nav rides the velocity warp — the page
+          shears fractionally with scroll speed and springs back at rest,
+          so fast scrolling feels like pulling against something physical. */}
+      <VelocityWarp>
 
       {/* ── HERO — Act 0: the noise ──
           Full-viewport stage for the live ticker field. Phase 1 ships the
@@ -496,6 +502,9 @@ export default function LandingPage() {
       {/* ── THE TERMINAL — one real product shot, parallax ── */}
       <TerminalShot />
 
+      {/* ── THE VERDICT WALL — giant type interlude, scroll-sheared ── */}
+      <TypeWall />
+
       {/* ── TRACK RECORD — real public scoreboard, honest by design ── */}
       <TrackRecordLedger />
 
@@ -503,7 +512,7 @@ export default function LandingPage() {
       <section className="relative z-10 px-8 py-16 max-w-7xl mx-auto">
         <FadeIn direction="up">
           <div className="text-center mb-12">
-            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Instruments</p>
+            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="Instruments" /></p>
             <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
               Six instruments, <span className="text-gradient-signal">one terminal.</span>
             </h2>
@@ -537,7 +546,7 @@ export default function LandingPage() {
       <section id="pricing" className="relative z-10 px-8 py-20 max-w-7xl mx-auto">
         <FadeIn direction="up">
           <div className="text-center mb-12">
-            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Pricing</p>
+            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3"><GlitchText text="Pricing" /></p>
             <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
               Simple pricing, <span className="text-gradient-signal">no surprises.</span>
             </h2>
@@ -590,6 +599,8 @@ export default function LandingPage() {
         <FadeIn direction="up">
           <div className="relative overflow-hidden bg-gradient-to-br from-green/8 to-purple-500/5 border border-green/15 rounded-3xl px-8 py-14 text-center">
             <div aria-hidden className="absolute inset-0 landing-grid-texture opacity-50 pointer-events-none" />
+            {/* The wire terrain bows away from the cursor behind the form */}
+            <WireTerrain className="absolute inset-0" />
             <div className="relative">
               <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white mb-3 leading-tight">
                 The market never stops talking.
@@ -608,6 +619,8 @@ export default function LandingPage() {
 
       {/* ── THE TAPE, again — bookend ── */}
       <TickerTape />
+
+      </VelocityWarp>
 
       {/* ── FOOTER ── */}
       <footer className="relative z-10 border-t border-border/20 px-8 py-8">

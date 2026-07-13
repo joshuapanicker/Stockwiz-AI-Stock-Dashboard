@@ -50,3 +50,6 @@ ui/.env.local
 
 # Personal AI architecture reference (kept local, never committed)
 AI_ARCHITECTURE.md
+
+# Design reference material (local inspiration only, never committed)
+referenceWebsites/
