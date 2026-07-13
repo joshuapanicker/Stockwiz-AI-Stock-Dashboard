@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -73,6 +73,19 @@ body {
   background: rgba(255, 255, 255, 0.035);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+}
+
+/* ── Landing: "Signal from Noise" ─────────────────────────────────────────
+   Static hero texture — an empty grid of ticker cells awaiting the live
+   canvas field (phase 2). Renders instantly (pure CSS) so LCP never waits
+   on JS; the canvas will mount over it as progressive enhancement. */
+.landing-grid-texture {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 128px 44px; /* wide short cells — ticker rows, not graph paper */
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 42%, black 25%, transparent 78%);
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 42%, black 25%, transparent 78%);
 }
 
 /* ── Chart hover interaction ─────────────────────────────────────────────

@@ -7,8 +7,34 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useInView } from "../hooks/useInView";
-import { apiFetch } from "../hooks/useApi";
+import { apiFetch, useMarket } from "../hooks/useApi";
 import { TermsOfService, PrivacyPolicy } from "./LegalPages";
+
+// ── Live SPY/VIX micro-ticker (nav) ───────────────────────────────────────
+// First proof the page is alive: real numbers from /api/market, mono voice.
+// Renders nothing until data lands (or if the API is unreachable).
+
+function MicroTicker() {
+  const market = useMarket();
+  if (!market || market.spy_latest == null) return null;
+  const trend = String(market.market_trend ?? "").toLowerCase();
+  const up = trend.includes("up");
+  const down = trend.includes("down");
+  return (
+    <div className="hidden lg:flex items-center gap-3 font-mono text-[11px] tracking-wider text-white/40">
+      <span>
+        SPY{" "}
+        <span className={up ? "text-green" : down ? "text-red" : "text-white/75"}>
+          ${Number(market.spy_latest).toFixed(2)}{up ? " ▲" : down ? " ▼" : ""}
+        </span>
+      </span>
+      <span className="text-white/15">·</span>
+      <span>
+        VIX <span className="text-white/75">{market.vix != null ? Number(market.vix).toFixed(1) : "—"}</span>
+      </span>
+    </div>
+  );
+}
 
 // ── Animated counter ──────────────────────────────────────────────────────
 
@@ -410,146 +436,110 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-white">
+    <div className="min-h-screen text-white" style={{ background: "#06080D" }}>
       <style>{`body { overflow-x: hidden; }`}</style>
 
-      {/* Animated background */}
+      {/* Static ambience — quiet washes only; the hero carries its own
+          texture and all motion budget is reserved for the ticker field. */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.10) 0%, transparent 60%)" }} />
-        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.07) 0%, transparent 55%)" }} />
-        {/* Slow-moving gradient orbs */}
-        <div className="absolute w-96 h-96 rounded-full opacity-20 blur-3xl"
-          style={{ background: "rgba(46,230,168,0.15)", top: "10%", left: "5%", animation: "float 12s ease-in-out infinite" }} />
-        <div className="absolute w-72 h-72 rounded-full opacity-15 blur-3xl"
-          style={{ background: "rgba(128,85,245,0.2)", bottom: "20%", right: "10%", animation: "float 16s ease-in-out infinite reverse" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.07) 0%, transparent 60%)" }} />
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.06) 0%, transparent 55%)" }} />
       </div>
 
-      {/* ── NAV ── */}
-      <nav className="relative z-10 flex items-center justify-between px-8 py-5 border-b border-border/20">
+      {/* ── NAV — glass bar with live market pulse ── */}
+      <nav className="relative z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-md">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-green/15 border border-green/20 flex items-center justify-center">
             <TrendingUp size={16} className="text-green" />
           </div>
           <span className="text-white font-bold text-lg tracking-tight">StockWiz</span>
         </div>
-        <div className="hidden md:flex items-center gap-8 text-sm text-muted">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <MicroTicker />
         </div>
-        <button onClick={scrollToAuth}
-          className="flex items-center gap-2 bg-green/10 hover:bg-green/20 border border-green/30 text-green rounded-xl px-4 py-2 text-sm font-semibold transition-all">
-          Get Started <ArrowRight size={14} />
-        </button>
+        <div className="flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-8 text-sm text-muted">
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          </div>
+          <button onClick={scrollToAuth}
+            className="flex items-center gap-2 bg-green/10 hover:bg-green/20 border border-green/30 text-green rounded-xl px-4 py-2 text-sm font-semibold transition-all">
+            Get Started <ArrowRight size={14} />
+          </button>
+        </div>
       </nav>
 
-      {/* ── HERO ── */}
-      <section className="relative z-10 px-8 pt-10 pb-4 max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row items-start gap-12">
+      {/* ── HERO — Act 0: the noise ──
+          Full-viewport stage for the live ticker field. Phase 1 ships the
+          static layer (pure CSS texture + type) so LCP is instant; the
+          canvas field mounts into #ticker-field-root in phase 2 as
+          progressive enhancement. */}
+      <section className="relative z-10 flex flex-col overflow-hidden" style={{ minHeight: "calc(100vh - 65px)" }}>
 
-          {/* Left */}
-          <div className="flex-1 min-w-0 pt-4">
-            <FadeIn direction="up">
-              <div className="inline-flex items-center gap-2 bg-green/10 border border-green/20 rounded-full px-3 py-1 text-xs text-green font-medium mb-6">
-                <Zap size={11} /> AI-Powered Stock Intelligence
-              </div>
-            </FadeIn>
-
-            <FadeIn direction="up" delay={80}>
-              <h1 className="text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-1">Screen smarter.</h1>
-            </FadeIn>
-            <FadeIn direction="up" delay={140}>
-              <h1 className="text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-1 text-green">Invest better.</h1>
-            </FadeIn>
-            <FadeIn direction="up" delay={200}>
-              <h1 className="text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6 text-white/40">Act with clarity.</h1>
-            </FadeIn>
-
-            <FadeIn direction="up" delay={260}>
-              <p className="text-white/55 text-lg leading-relaxed max-w-md mb-8">
-                Live market data meets Claude AI — screen 5,700+ US stocks,
-                surface buy signals, and get plain-English analysis on any position.
-              </p>
-            </FadeIn>
-
-            <FadeIn direction="up" delay={320}>
-              <div className="flex items-center gap-4 flex-wrap mb-8">
-                <button onClick={scrollToAuth}
-                  className="flex items-center gap-2 bg-green text-bg rounded-xl px-6 py-3 text-sm font-bold hover:bg-green/90 transition-colors shadow-lg shadow-green/20">
-                  Start for free <ArrowRight size={15} />
-                </button>
-                <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-                  className="flex items-center gap-2 text-muted hover:text-white text-sm transition-colors">
-                  See features <ChevronRight size={14} />
-                </button>
-              </div>
-            </FadeIn>
-
-            <FadeIn direction="up" delay={380}>
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  {["#2EE6A8","#8055F5","#FFAC26","#00bcd4"].map((c, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full border-2 border-bg flex items-center justify-center text-[10px] font-bold text-white"
-                      style={{ background: c }}>{["J","A","M","S"][i]}</div>
-                  ))}
-                </div>
-                <p className="text-muted text-xs">Join other Investors on StockWiz</p>
-              </div>
-            </FadeIn>
-          </div>
-
-          {/* Right — hero screenshot */}
-          <div className="flex-1 min-w-0 w-full">
-            <FadeIn direction="right" delay={200}>
-              <div className="relative">
-                {/* Glow behind the frame */}
-                <div className="absolute -inset-4 rounded-3xl opacity-30 blur-2xl"
-                  style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.3), transparent 70%)" }} />
-                <BrowserFrame
-                  src="/screenshots/dashboard.png"
-                  alt="StockWiz dashboard showing candlestick charts and AI analysis"
-                  className="relative"
-                />
-                {/* Floating badge */}
-                <div className="absolute -bottom-4 -left-4 bg-card border border-green/30 rounded-xl px-4 py-3 shadow-xl flex items-center gap-2.5 anim-scale-in">
-                  <div className="w-2 h-2 rounded-full bg-green animate-pulse" />
-                  <div>
-                    <p className="text-white text-xs font-semibold">Live data</p>
-                    <p className="text-muted text-[10px]">Yahoo Finance · real-time</p>
-                  </div>
-                </div>
-                <div className="absolute -top-4 -right-4 bg-card border border-purple/30 rounded-xl px-4 py-3 shadow-xl flex items-center gap-2.5">
-                  <Bot size={14} className="text-purple-400" />
-                  <div>
-                    <p className="text-white text-xs font-semibold">Claude AI</p>
-                    <p className="text-muted text-[10px]">Streaming analysis</p>
-                  </div>
-                </div>
-              </div>
-            </FadeIn>
-          </div>
+        {/* Ticker-field stage — canvas mounts here (phase 2) */}
+        <div id="ticker-field-root" aria-hidden className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 landing-grid-texture" />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 55% at 50% 118%, rgba(46,230,168,0.09), transparent 65%)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 45% 35% at 88% -8%, rgba(128,85,245,0.08), transparent 60%)" }} />
         </div>
-      </section>
 
-      {/* ── STATS ── */}
-      <section className="relative z-10 px-8 py-2 max-w-7xl mx-auto">
-        <FadeIn direction="up">
-          <div className="bg-card/60 border border-border/40 rounded-2xl px-8 py-6 backdrop-blur-sm">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 divide-x divide-border/30">
-              {[
-                { to: 5700, suffix: "+", label: "Stocks in universe" },
-                { to: 4,   suffix: "",  label: "Strategy presets" },
-                { to: 6,   suffix: "",  label: "Chart types" },
-                { to: 3,   suffix: "",  label: "AI chat modes" },
-              ].map(({ to, suffix, label }) => (
-                <div key={label} className="text-center px-4">
-                  <p className="text-2xl font-bold font-mono text-white">
-                    <Counter to={to} suffix={suffix} />
-                  </p>
-                  <p className="text-muted text-xs mt-0.5">{label}</p>
-                </div>
-              ))}
+        <div className="relative flex-1 flex flex-col items-center justify-center text-center px-6 pt-14 pb-10 max-w-4xl mx-auto w-full">
+
+          <FadeIn direction="up">
+            <div className="inline-flex items-center gap-2.5 border border-white/10 bg-white/[0.03] rounded-full px-4 py-1.5 font-mono text-[11px] tracking-[0.18em] text-white/60 uppercase mb-10 backdrop-blur-sm">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green opacity-60" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green" />
+              </span>
+              Live · reading 5,700 tickers
             </div>
+          </FadeIn>
+
+          {/* Two voices: the market speaks in mono, the judgment in serif. */}
+          <h1 className="mb-8">
+            <FadeIn direction="up" delay={100}>
+              <span className="block font-mono text-xl md:text-2xl tracking-[0.28em] text-white/55 uppercase mb-5">
+                5,700 stocks.
+              </span>
+            </FadeIn>
+            <FadeIn direction="up" delay={220}>
+              <span className="block font-serif italic text-6xl md:text-8xl leading-[1.02] text-white">
+                One verdict.
+              </span>
+            </FadeIn>
+          </h1>
+
+          <FadeIn direction="up" delay={340}>
+            <p className="text-white/55 text-base md:text-lg leading-relaxed max-w-xl mb-10">
+              Live market data, your rules, and <span className="text-purple">Claude reasoning</span> over
+              every position — in plain English, as it streams.
+            </p>
+          </FadeIn>
+
+          <FadeIn direction="up" delay={440}>
+            <div className="flex items-center justify-center gap-5 flex-wrap">
+              <button onClick={scrollToAuth}
+                className="flex items-center gap-2 bg-green text-bg rounded-xl px-7 py-3.5 text-sm font-bold hover:bg-green/90 transition-colors shadow-lg shadow-green/20">
+                Start for free <ArrowRight size={15} />
+              </button>
+              <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+                className="flex items-center gap-2 font-mono text-xs tracking-wider text-muted hover:text-white uppercase transition-colors">
+                How a verdict gets made <ChevronRight size={13} />
+              </button>
+            </div>
+          </FadeIn>
+        </div>
+
+        {/* Proof strip — three true numbers, mono voice. Replaces the old
+            inventory stats card ("4 presets / 6 chart types"). */}
+        <FadeIn direction="up" delay={560}>
+          <div className="relative flex flex-wrap items-center justify-center gap-x-8 gap-y-2 px-6 pb-12 font-mono text-[11px] md:text-xs tracking-[0.14em] text-white/40 uppercase">
+            <span><span className="text-white/85">5,700+</span> US listings scanned</span>
+            <span className="hidden md:inline text-white/15">·</span>
+            <span><span className="text-white/85">200K</span> free AI tokens / mo</span>
+            <span className="hidden md:inline text-white/15">·</span>
+            <span>Every verdict graded at <span className="text-white/85">30/90/180d</span></span>
           </div>
         </FadeIn>
       </section>
