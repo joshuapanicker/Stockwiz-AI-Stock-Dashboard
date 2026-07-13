@@ -20,9 +20,10 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
-        // Landing "judgment" voice — squared techy display face that sits
-        // naturally next to JetBrains Mono (data voice).
-        display: ['"Chakra Petch"', "Inter", "system-ui", "sans-serif"],
+        // Landing "judgment" voice — Jost, a free geometric sans modeled on
+        // Futura's proportions (Futura/Greycliff/Monopoly aren't licensed
+        // for free web embedding).
+        display: ['"Jost"', "Inter", "system-ui", "sans-serif"],
       },
     },
   },
