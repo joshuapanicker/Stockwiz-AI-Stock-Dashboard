@@ -65,7 +65,7 @@ StockWiz combines live market data from Yahoo Finance with Claude AI to automate
 
 ## Screenshots
 
-<img width="1710" height="979" alt="Screenshot 2026-07-07 at 1 50 38 PM" src="https://github.com/user-attachments/assets/32a24832-57f3-4f13-9fbd-b8d94a404df3" />
+<img width="3420" height="1958" alt="image" src="https://github.com/user-attachments/assets/1fa9f456-db10-4e06-86e1-37bbb29659a8" />
 
 <img width="1710" height="979" alt="Screenshot 2026-07-07 at 1 53 03 PM" src="https://github.com/user-attachments/assets/2c408ebe-aa47-40c8-9668-a77a57a830b8" />
 
