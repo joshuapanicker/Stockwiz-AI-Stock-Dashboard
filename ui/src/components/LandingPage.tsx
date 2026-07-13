@@ -17,6 +17,7 @@ import TypeWall from "./landing/TypeWall";
 import WireTerrain from "./landing/WireTerrain";
 import IntroLoader from "./landing/IntroLoader";
 import InstrumentsRail, { INSTRUMENTS } from "./landing/InstrumentsRail";
+import AppShowcase from "./landing/AppShowcase";
 import { GlitchText, ScrambleLink, VelocityWarp, SpotlightCard, ScrollFillText } from "./landing/Effects";
 import { DataConstellation, CursorGlow, ScrollProgress, TickerTape, AmbientWashes } from "./landing/Atmosphere";
 
@@ -567,6 +568,9 @@ export default function LandingPage() {
 
       {/* ── THE TERMINAL — one real product shot, parallax ── */}
       <TerminalShot />
+
+      {/* ── LIVE DEMO — real screen recording, scroll scrubs playback ── */}
+      <AppShowcase />
 
       {/* ── THE VERDICT WALL — giant type interlude, scroll-sheared ── */}
       <TypeWall />
