@@ -9,6 +9,42 @@ import { useAuth } from "../context/AuthContext";
 import { useInView } from "../hooks/useInView";
 import { apiFetch, useMarket } from "../hooks/useApi";
 import { TermsOfService, PrivacyPolicy } from "./LegalPages";
+import TickerField, { type IgnitedTicker } from "./landing/TickerField";
+import VerdictCard from "./landing/VerdictCard";
+import PipelineShowcase from "./landing/PipelineShowcase";
+import TrackRecordLedger from "./landing/TrackRecordLedger";
+
+// ── Magnetic wrapper — buttons lean toward the cursor, spring back ────────
+
+function Magnetic({ children, strength = 0.3 }: { children: React.ReactNode; strength?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    function onMove(e: MouseEvent) {
+      const r = el!.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      const dist = Math.hypot(dx, dy);
+      const range = 110;
+      el!.style.transform = dist < range
+        ? `translate(${dx * (1 - dist / range) * strength}px, ${dy * (1 - dist / range) * strength}px)`
+        : "";
+    }
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [strength]);
+
+  return (
+    <div ref={ref} className="inline-block will-change-transform"
+      style={{ transition: "transform 0.3s cubic-bezier(0.2, 0.8, 0.3, 1)" }}>
+      {children}
+    </div>
+  );
+}
 
 // ── Live SPY/VIX micro-ticker (nav) ───────────────────────────────────────
 // First proof the page is alive: real numbers from /api/market, mono voice.
@@ -34,29 +70,6 @@ function MicroTicker() {
       </span>
     </div>
   );
-}
-
-// ── Animated counter ──────────────────────────────────────────────────────
-
-function Counter({ to, suffix = "" }: { to: number; suffix?: string }) {
-  const [val, setVal] = useState(0);
-  const { ref, inView } = useInView(0.3);
-
-  useEffect(() => {
-    if (!inView) return;
-    const duration = 1200;
-    const steps = 40;
-    const inc = to / steps;
-    let current = 0;
-    const interval = setInterval(() => {
-      current += inc;
-      if (current >= to) { setVal(to); clearInterval(interval); }
-      else setVal(Math.floor(current));
-    }, duration / steps);
-    return () => clearInterval(interval);
-  }, [inView, to]);
-
-  return <span ref={ref}>{val}{suffix}</span>;
 }
 
 // ── Fade-in wrapper ───────────────────────────────────────────────────────
@@ -260,167 +273,46 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
   );
 }
 
-// ── Feature tab preview ───────────────────────────────────────────────────
+// ── The terminal — one real product shot, gentle parallax ─────────────────
 
-const FEATURE_TABS = [
-  {
-    id: "dashboard",
-    label: "Analysis Dashboard",
-    icon: <BarChart2 size={14} />,
-    img: "/screenshots/feature3.png",
-    title: "Live charts + AI analysis, side by side",
-    desc: "Candlestick charts, 6-month area, ROI, and Volume Profile — all powered by live Yahoo Finance data. Search any stock, click it to pull up a detailed breakdown, and consult the per-stock AI agent to ask questions like 'is this a good entry point?' or 'what are the biggest risks right now?'",
-  },
-  {
-    id: "screener",
-    label: "Portfolio Tracker",
-    icon: <TrendingUp size={14} />,
-    img: "/screenshots/feature2.png",
-    title: "Track your positions with real P&L and AI sell signals",
-    desc: "See your portfolio's combined value over time, allocation by holding, and live unrealized gains. Screener signals on the right show which stocks currently meet your buy or watch criteria — so you always know what to act on alongside what you already own.",
-  },
-  {
-    id: "portfolio",
-    label: "Market Assistant",
-    icon: <Bot size={14} />,
-    img: "/screenshots/feature1.png",
-    title: "Ask anything about markets, strategies, and economics",
-    desc: "A general-purpose AI financial assistant with live market data injected at query time. Ask about sector rotation, compare two stocks, get a bear market strategy, or just talk through your investment thesis. It knows the current SPY price, VIX level, and can pull live data on any ticker you mention.",
-  },
-];
-
-// ── Sticky scroll feature showcase ───────────────────────────────────────
-
-function ScrollFeatureShowcase() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [progress, setProgress] = useState(0); // 0..1 within current tab
+function TerminalShot() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     function onScroll() {
-      const el = containerRef.current;
+      const el = ref.current;
       if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const scrollable = el.offsetHeight - window.innerHeight;
-      if (scrollable <= 0) return;
-      const raw = Math.max(0, Math.min(1, -rect.top / scrollable));
-      // Map 0..1 to 0..N tabs
-      const total = FEATURE_TABS.length;
-      const scaled = raw * total;
-      const idx = Math.min(total - 1, Math.floor(scaled));
-      const prog = scaled - Math.floor(scaled);
-      setActiveIndex(idx);
-      setProgress(prog);
+      const r = el.getBoundingClientRect();
+      const center = r.top + r.height / 2 - window.innerHeight / 2;
+      setOffset(Math.max(-36, Math.min(36, -center * 0.055)));
     }
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const tab = FEATURE_TABS[activeIndex];
-  const nextTab = FEATURE_TABS[Math.min(activeIndex + 1, FEATURE_TABS.length - 1)];
-  // Crossfade: current fades out when progress > 0.7, next fades in
-  const fadeOut = progress > 0.7 ? (progress - 0.7) / 0.3 : 0;
-  const imgOpacity = 1 - fadeOut;
-  const nextImgOpacity = fadeOut;
-
   return (
-    /* Outer tall container — provides scroll room (300vh) */
-    <div ref={containerRef} style={{ height: `${FEATURE_TABS.length * 100}vh` }} className="relative w-full">
-      {/* Sticky inner — fills full viewport, content centered */}
-      <div style={{ position: "sticky", top: 0, height: "100vh", width: "100%", background: "var(--bg, #0B0D12)" }}>
-        <div style={{ height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "2rem 2rem", maxWidth: "80rem", margin: "0 auto" }}>
-
-        {/* Section header */}
-        <div className="text-center mb-4 flex-shrink-0">
-          <p className="text-green text-xs font-semibold uppercase tracking-widest mb-2">Product</p>
-          <h2 className="text-4xl font-bold text-white">See it in action</h2>
-          <p className="text-muted mt-2 text-sm">Every feature is built around real data. No mock charts, no placeholders.</p>
+    <section className="relative z-10 px-6 md:px-8 py-20 max-w-6xl mx-auto">
+      <FadeIn direction="up">
+        <div className="text-center mb-12">
+          <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">The terminal</p>
+          <h2 className="font-serif text-4xl md:text-5xl text-white">
+            Where the verdicts <span className="italic">land.</span>
+          </h2>
         </div>
-
-        <div className="flex gap-10 items-center flex-1 min-h-0">
-
-          {/* Left — text + progress indicators */}
-          <div className="w-72 flex-shrink-0 space-y-6">
-            {/* Progress dots */}
-            <div className="flex gap-2 mb-8">
-              {FEATURE_TABS.map((_, i) => (
-                <div key={i} className="flex-1 h-0.5 rounded-full bg-border/40 overflow-hidden">
-                  <div className="h-full bg-green rounded-full transition-all duration-100"
-                    style={{ width: i < activeIndex ? "100%" : i === activeIndex ? `${progress * 100}%` : "0%" }} />
-                </div>
-              ))}
-            </div>
-
-            {/* Tab labels — all three visible, active one highlighted */}
-            <div className="space-y-1">
-              {FEATURE_TABS.map((t, i) => (
-                <div key={t.id}
-                  className={clsx("flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
-                    i === activeIndex ? "bg-green/10 border border-green/20" : "opacity-40")}>
-                  <span className={i === activeIndex ? "text-green" : "text-muted"}>{t.icon}</span>
-                  <span className={clsx("text-sm font-medium", i === activeIndex ? "text-white" : "text-muted")}>
-                    {t.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Active tab description — fades with progress */}
-            <div style={{ opacity: 1 - fadeOut * 2 }} className="transition-opacity duration-100">
-              <h3 className="text-white font-bold text-lg mb-2 leading-snug">{tab.title}</h3>
-              <p className="text-muted text-sm leading-relaxed">{tab.desc}</p>
-            </div>
-          </div>
-
-          {/* Right — stacked images with crossfade */}
-          <div className="flex-1 min-w-0 relative overflow-hidden" style={{ maxHeight: "calc(100vh - 280px)" }}>
-            {/* Glow */}
-            <div className="absolute -inset-4 rounded-3xl blur-3xl opacity-25 pointer-events-none"
-              style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.3), transparent 70%)" }} />
-
-            {/* Current image */}
-            <div className="relative rounded-2xl overflow-hidden border border-border/60 shadow-2xl" style={{ opacity: imgOpacity, transition: "opacity 0.15s ease" }}>
-              <div className="bg-card2 border-b border-border/50 px-4 py-2 flex items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red/60" /><div className="w-2.5 h-2.5 rounded-full bg-orange/60" /><div className="w-2.5 h-2.5 rounded-full bg-green/60" />
-                </div>
-                <div className="flex-1 bg-card border border-border/40 rounded-md px-3 py-0.5 mx-3">
-                  <span className="text-[10px] text-muted">stockwiz.com</span>
-                </div>
-              </div>
-              <img src={tab.img} alt={tab.label} style={{ width: "100%", display: "block", maxHeight: "calc(100vh - 340px)", objectFit: "cover", objectPosition: "top" }} />
-            </div>
-
-            {/* Next image — fades in on top */}
-            {nextTab.id !== tab.id && (
-              <div className="absolute inset-0 rounded-2xl overflow-hidden border border-border/60 shadow-2xl" style={{ opacity: nextImgOpacity, transition: "opacity 0.15s ease" }}>
-                <div className="bg-card2 border-b border-border/50 px-4 py-2 flex items-center gap-2">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red/60" /><div className="w-2.5 h-2.5 rounded-full bg-orange/60" /><div className="w-2.5 h-2.5 rounded-full bg-green/60" />
-                  </div>
-                  <div className="flex-1 bg-card border border-border/40 rounded-md px-3 py-0.5 mx-3">
-                    <span className="text-[10px] text-muted">stockwiz.com</span>
-                  </div>
-                </div>
-                <img src={nextTab.img} alt={nextTab.label} style={{ width: "100%", display: "block", maxHeight: "calc(100vh - 340px)", objectFit: "cover", objectPosition: "top" }} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Scroll hint */}
-        {activeIndex === 0 && progress < 0.15 && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-muted text-[10px] anim-fade-up">
-            <div className="w-4 h-7 border border-muted/40 rounded-full flex items-start justify-center pt-1">
-              <div className="w-1 h-2 bg-muted/60 rounded-full animate-bounce" />
-            </div>
-            scroll to explore
-          </div>
-        )}
-        </div>{/* end max-w inner */}
-      </div>{/* end sticky */}
-    </div>
+      </FadeIn>
+      <div ref={ref} className="relative will-change-transform" style={{ transform: `translateY(${offset}px)` }}>
+        <div className="absolute -inset-6 rounded-3xl blur-3xl opacity-25 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(46,230,168,0.28), transparent 70%)" }} />
+        <BrowserFrame
+          src="/screenshots/dashboard.png"
+          alt="StockWiz dashboard - candlestick charts, screener signals, and streaming AI analysis"
+          className="relative"
+        />
+      </div>
+    </section>
   );
 }
 
@@ -430,6 +322,8 @@ export default function LandingPage() {
   const authRef = useRef<HTMLDivElement>(null);
   const [termsOpen, setTermsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  // The hero's canvas field hands ignited tickers to the verdict card
+  const [ignited, setIgnited] = useState<IgnitedTicker | null>(null);
 
   function scrollToAuth() {
     authRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -459,8 +353,8 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-8">
           <div className="hidden md:flex items-center gap-8 text-sm text-muted">
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors">How it works</a>
+            <a href="#features" className="hover:text-white transition-colors">Pipeline</a>
+            <a href="#track-record" className="hover:text-white transition-colors">Track record</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           </div>
           <button onClick={scrollToAuth}
@@ -477,12 +371,17 @@ export default function LandingPage() {
           progressive enhancement. */}
       <section className="relative z-10 flex flex-col overflow-hidden" style={{ minHeight: "calc(100vh - 65px)" }}>
 
-        {/* Ticker-field stage — canvas mounts here (phase 2) */}
+        {/* Ticker-field stage — CSS texture renders instantly (LCP), the
+            live canvas field mounts over it as progressive enhancement */}
         <div id="ticker-field-root" aria-hidden className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 landing-grid-texture" />
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 55% at 50% 118%, rgba(46,230,168,0.09), transparent 65%)" }} />
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 45% 35% at 88% -8%, rgba(128,85,245,0.08), transparent 60%)" }} />
+          <TickerField onIgnite={setIgnited} className="absolute inset-0 w-full h-full" />
         </div>
+
+        {/* The verdict card — where an ignited ticker becomes a decision */}
+        <VerdictCard ticker={ignited} className="hidden xl:block absolute right-10 bottom-32 z-10 anim-fade-in" />
 
         <div className="relative flex-1 flex flex-col items-center justify-center text-center px-6 pt-14 pb-10 max-w-4xl mx-auto w-full">
 
@@ -519,10 +418,12 @@ export default function LandingPage() {
 
           <FadeIn direction="up" delay={440}>
             <div className="flex items-center justify-center gap-5 flex-wrap">
-              <button onClick={scrollToAuth}
-                className="flex items-center gap-2 bg-green text-bg rounded-xl px-7 py-3.5 text-sm font-bold hover:bg-green/90 transition-colors shadow-lg shadow-green/20">
-                Start for free <ArrowRight size={15} />
-              </button>
+              <Magnetic>
+                <button onClick={scrollToAuth}
+                  className="flex items-center gap-2 bg-green text-bg rounded-xl px-7 py-3.5 text-sm font-bold hover:bg-green/90 transition-colors shadow-lg shadow-green/20">
+                  Start for free <ArrowRight size={15} />
+                </button>
+              </Magnetic>
               <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
                 className="flex items-center gap-2 font-mono text-xs tracking-wider text-muted hover:text-white uppercase transition-colors">
                 How a verdict gets made <ChevronRight size={13} />
@@ -544,39 +445,27 @@ export default function LandingPage() {
         </FadeIn>
       </section>
 
-      {/* ── STICKY SCROLL FEATURE SHOWCASE ── */}
-      {/* The outer div is tall (300vh) to give scroll room. Content is sticky. */}
+      {/* ── THE PIPELINE — scroll-scrubbed 4-act sequence ── */}
       <section id="features" className="relative z-10">
-        <ScrollFeatureShowcase />
+        <PipelineShowcase />
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <section id="how-it-works" className="relative z-10 px-8 pt-8 pb-20 max-w-7xl mx-auto">
+      {/* ── THE TERMINAL — one real product shot, parallax ── */}
+      <TerminalShot />
+
+      {/* ── TRACK RECORD — real public scoreboard, honest by design ── */}
+      <TrackRecordLedger />
+
+      {/* ── INSTRUMENTS — capability grid, deliberately quiet ── */}
+      <section className="relative z-10 px-8 py-16 max-w-7xl mx-auto">
         <FadeIn direction="up">
-          <div className="text-center mb-14">
-            <p className="text-green text-xs font-semibold uppercase tracking-widest mb-3">How it works</p>
-            <h2 className="text-4xl font-bold text-white">From data to decision in seconds</h2>
+          <div className="text-center mb-12">
+            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Instruments</p>
+            <h2 className="font-serif text-4xl md:text-5xl text-white">
+              Six instruments, <span className="italic">one terminal.</span>
+            </h2>
           </div>
         </FadeIn>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { step: "01", title: "Set your criteria", desc: "Pick a strategy preset — Value, Growth, Momentum, Conservative — or build your own rules with the visual editor.", delay: 0 },
-            { step: "02", title: "Scan the universe", desc: "StockWiz evaluates 5,700+ US stocks — every NASDAQ, NYSE & AMEX listing — against your criteria and surfaces the ones worth watching.", delay: 120 },
-            { step: "03", title: "Get AI analysis", desc: "Click any stock and Claude AI gives you plain-English reasoning based on live data injected at request time.", delay: 240 },
-          ].map(({ step, title, desc, delay }) => (
-            <FadeIn key={step} direction="up" delay={delay}>
-              <div className="relative p-6 bg-card border border-border/30 rounded-2xl hover:border-green/20 transition-colors">
-                <div className="text-6xl font-black text-green/8 font-mono leading-none mb-4 select-none">{step}</div>
-                <h3 className="text-white font-semibold text-base mb-2">{title}</h3>
-                <p className="text-muted text-sm leading-relaxed">{desc}</p>
-              </div>
-            </FadeIn>
-          ))}
-        </div>
-      </section>
-
-      {/* ── FEATURES GRID ── */}
-      <section className="relative z-10 px-8 py-12 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
             { icon: <Bot size={17}/>,         title: "AI Stock Analysis",       desc: "Claude AI analyzes every stock with live data injected — grounded in real numbers, not generic advice.", delay: 0 },
@@ -587,11 +476,11 @@ export default function LandingPage() {
             { icon: <Star size={17}/>,        title: "90-Day Prediction",       desc: "Bull/base/bear price projections generated by Claude from recent momentum and fundamentals.", delay: 120 },
           ].map(({ icon, title, desc, delay }) => (
             <FadeIn key={title} direction="up" delay={delay}>
-              <div className="bg-card border border-border/30 rounded-2xl p-5 hover:border-green/20 transition-colors group">
+              <div className="glass-card border border-white/[0.07] rounded-2xl p-5 hover:border-green/25 transition-colors group">
                 <div className="w-9 h-9 rounded-xl bg-green/10 border border-green/20 flex items-center justify-center mb-4 text-green group-hover:bg-green/15 transition-colors">
                   {icon}
                 </div>
-                <p className="text-white font-semibold text-sm mb-1.5">{title}</p>
+                <p className="font-mono text-xs tracking-[0.12em] uppercase text-white mb-2">{title}</p>
                 <p className="text-muted text-xs leading-relaxed">{desc}</p>
               </div>
             </FadeIn>
@@ -603,8 +492,10 @@ export default function LandingPage() {
       <section id="pricing" className="relative z-10 px-8 py-20 max-w-7xl mx-auto">
         <FadeIn direction="up">
           <div className="text-center mb-12">
-            <p className="text-green text-xs font-semibold uppercase tracking-widest mb-3">Pricing</p>
-            <h2 className="text-4xl font-bold text-white">Simple pricing, no surprises</h2>
+            <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Pricing</p>
+            <h2 className="font-serif text-4xl md:text-5xl text-white">
+              Simple pricing, <span className="italic">no surprises.</span>
+            </h2>
           </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
@@ -612,7 +503,7 @@ export default function LandingPage() {
             <div className="bg-card border border-green/20 rounded-2xl p-6 h-full">
               <p className="text-white font-bold text-lg mb-1">Free</p>
               <p className="text-3xl font-mono font-black text-white mb-1">$0<span className="text-muted text-sm font-normal">/mo</span></p>
-              <p className="text-muted text-xs mb-5">Full dashboard, always free</p>
+              <p className="font-mono text-[10px] tracking-wider text-muted uppercase mb-5">200K AI tokens/mo · own key = unlimited</p>
               <div className="space-y-2 mb-6">
                 {["Stock Search Engine (5,700+ US stocks)", "AI criteria builder + presets", "Portfolio tracker with P&L", "Live market data", "Volume Profile charts", "AI analysis + chat"].map(f => (
                   <div key={f} className="flex items-center gap-2 text-xs text-white/70">
@@ -649,16 +540,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA + AUTH ── */}
+      {/* ── CTA + AUTH — the noise returns, quietly, behind the form ── */}
       <section ref={authRef} className="relative z-10 px-8 py-20 max-w-7xl mx-auto">
         <FadeIn direction="up">
-          <div className="bg-gradient-to-br from-green/8 to-purple-500/5 border border-green/15 rounded-3xl px-8 py-14 text-center">
-            <h2 className="text-4xl font-bold text-white mb-3">Ready to invest smarter?</h2>
-            <p className="text-muted mb-10 max-w-md mx-auto text-sm">
-              Join investors using StockWiz to make data-driven decisions backed by live AI analysis.
-            </p>
-            <div className="flex justify-center">
-              <AuthForm onOpenTerms={() => setTermsOpen(true)} onOpenPrivacy={() => setPrivacyOpen(true)} />
+          <div className="relative overflow-hidden bg-gradient-to-br from-green/8 to-purple-500/5 border border-green/15 rounded-3xl px-8 py-14 text-center">
+            <div aria-hidden className="absolute inset-0 landing-grid-texture opacity-50 pointer-events-none" />
+            <div className="relative">
+              <h2 className="font-serif text-4xl md:text-5xl text-white mb-3 leading-tight">
+                The market never stops talking.
+                <span className="block italic mt-1">Hear what matters.</span>
+              </h2>
+              <p className="text-muted mb-10 max-w-md mx-auto text-sm">
+                Free account, 200K AI tokens a month, every verdict graded in public.
+              </p>
+              <div className="flex justify-center">
+                <AuthForm onOpenTerms={() => setTermsOpen(true)} onOpenPrivacy={() => setPrivacyOpen(true)} />
+              </div>
             </div>
           </div>
         </FadeIn>
@@ -667,11 +564,14 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer className="relative z-10 border-t border-border/20 px-8 py-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-green/15 flex items-center justify-center">
-              <TrendingUp size={12} className="text-green" />
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-green/15 flex items-center justify-center">
+                <TrendingUp size={12} className="text-green" />
+              </div>
+              <span className="text-white font-semibold text-sm">StockWiz</span>
             </div>
-            <span className="text-white font-semibold text-sm">StockWiz</span>
+            <MicroTicker />
           </div>
           <p className="text-muted text-xs">© 2026 StockWiz · Not financial, investment, or tax advice. For informational purposes only. Past performance does not guarantee future results.</p>
           <div className="flex gap-6 text-xs text-muted">
@@ -683,15 +583,6 @@ export default function LandingPage() {
 
       <TermsOfService open={termsOpen} onClose={() => setTermsOpen(false)} />
       <PrivacyPolicy open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
-
-      {/* Float keyframe */}
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-20px) translateX(10px); }
-          66% { transform: translateY(10px) translateX(-10px); }
-        }
-      `}</style>
     </div>
   );
 }

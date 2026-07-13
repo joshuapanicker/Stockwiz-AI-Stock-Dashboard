@@ -88,6 +88,29 @@ body {
   mask-image: radial-gradient(ellipse 85% 75% at 50% 42%, black 25%, transparent 78%);
 }
 
+/* Verdict/criteria stamp — lands with a thunk (scale overshoot settle) */
+@keyframes stampIn {
+  0%   { opacity: 0; transform: scale(1.6); }
+  60%  { opacity: 1; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.anim-stamp { animation: stampIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+/* Terminal price flicker — discrete brightness steps, not a smooth fade */
+@keyframes pipelineFlicker {
+  0%, 100% { opacity: 1; }
+  12%      { opacity: 0.45; }
+  24%      { opacity: 1; }
+  61%      { opacity: 0.6; }
+  74%      { opacity: 1; }
+}
+.pipeline-flicker { animation: pipelineFlicker 2.8s steps(1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-stamp { animation: none; opacity: 1; }
+  .pipeline-flicker { animation: none; }
+}
+
 /* ── Chart hover interaction ─────────────────────────────────────────────
    Any card carrying .chart-card lifts and glows teal when the cursor is
    over it, so it's always clear which graph you're inspecting. */
