@@ -2,13 +2,13 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "stockwiz-ui",
+      "name": "stockbrook-ui",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "ui"],
       "port": 5173
     },
     {
-      "name": "stockwiz-api",
+      "name": "stockbrook-api",
       "runtimeExecutable": "py",
       "runtimeArgs": ["-3", "-m", "uvicorn", "api.server:app", "--port", "8000"],
       "port": 8000

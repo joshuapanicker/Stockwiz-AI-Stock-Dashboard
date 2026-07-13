@@ -101,7 +101,7 @@ def _download_listed_symbols(timeout: float = 30.0) -> list[str]:
     """Download and merge both symbol directories. Raises on failure."""
     merged: list[str] = []
     for url in SYMBOL_DIR_URLS:
-        resp = requests.get(url, headers={"User-Agent": "stockwiz/1.0"}, timeout=timeout)
+        resp = requests.get(url, headers={"User-Agent": "stockbrook/1.0"}, timeout=timeout)
         resp.raise_for_status()
         merged.extend(_parse_symbol_dir(resp.text, is_nasdaq="nasdaqlisted" in url))
     # Dedupe, preserve order

@@ -43,7 +43,7 @@ def _require_user_or_dev(user_id: str | None) -> None:
 import math
 from fastapi.responses import JSONResponse
 
-app = FastAPI(title="StockWiz API")
+app = FastAPI(title="Stockbrook API")
 
 # ── CORS ────────────────────────────────────────────────────────────────────
 # Restricted to our own frontends instead of "*". Auth is via Bearer tokens
@@ -88,7 +88,7 @@ def _cors_headers(request) -> dict:
 # Never echo str(exc) to the client — it can leak internal paths, DB errors,
 # and stack context that help an attacker map the system.
 import logging as _logging
-_log = _logging.getLogger("stockwiz")
+_log = _logging.getLogger("stockbrook")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

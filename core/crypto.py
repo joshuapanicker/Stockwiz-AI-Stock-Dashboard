@@ -5,7 +5,7 @@ row-level security and disk encryption: even a service-role-key leak or a
 database dump yields ciphertext instead of usable credentials.
 
 Backward-compatible and inert-until-configured:
-  - If STOCKWIZ_ENCRYPTION_KEY is unset, encrypt()/decrypt() are no-ops, so
+  - If STOCKBROOK_ENCRYPTION_KEY is unset, encrypt()/decrypt() are no-ops, so
     behavior is identical to today (values stored/read as plaintext).
   - decrypt() transparently passes through values that aren't valid
     ciphertext, so rows written before a key was configured keep working —
@@ -13,7 +13,7 @@ Backward-compatible and inert-until-configured:
 
 Generate a key:
     py -3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-Set the output as STOCKWIZ_ENCRYPTION_KEY in the backend environment.
+Set the output as STOCKBROOK_ENCRYPTION_KEY in the backend environment.
 Losing or rotating the key makes previously-encrypted values unrecoverable,
 so store it alongside your other production secrets.
 """
@@ -26,7 +26,10 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def _fernet():
-    key = os.environ.get("STOCKWIZ_ENCRYPTION_KEY", "").strip()
+    # Renamed from STOCKWIZ_ENCRYPTION_KEY during the Stockbrook rebrand —
+    # old name still read as a fallback in case it's already set in Railway.
+    key = (os.environ.get("STOCKBROOK_ENCRYPTION_KEY", "").strip()
+           or os.environ.get("STOCKWIZ_ENCRYPTION_KEY", "").strip())
     if not key:
         return None
     try:

@@ -1,5 +1,5 @@
 """
-StockWiz - main entry point.
+Stockbrook - main entry point.
 Runs the screener and prints results to stdout (UI layer to be added).
 """
 

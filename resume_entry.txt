@@ -1,4 +1,4 @@
-StockWiz — AI Stock Screening & Portfolio Dashboard
+Stockbrook — AI Stock Screening & Portfolio Dashboard
 
 Built a full-stack AI dashboard integrating Claude claude-haiku-4-5-20251001 with Yahoo Finance (yfinance) to automate stock classification
 Designed a FastAPI backend with SSE streaming endpoints that pipe Claude responses token-by-token to the frontend

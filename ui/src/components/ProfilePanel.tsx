@@ -262,7 +262,7 @@ export default function ProfilePanel({ open, onClose, onOpenSettings, portfolioS
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-border/40 flex-shrink-0">
-          <p className="text-[10px] text-muted text-center">StockWiz · AI Stock Dashboard</p>
+          <p className="text-[10px] text-muted text-center">Stockbrook · AI Stock Dashboard</p>
         </div>
       </div>
     </>

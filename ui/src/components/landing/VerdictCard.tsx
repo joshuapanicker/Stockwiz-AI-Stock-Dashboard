@@ -114,7 +114,7 @@ export default function VerdictCard({ ticker, className = "" }: {
       <div className={className}>
         <div className="border border-white/10 rounded-2xl px-5 py-4 w-[340px]" style={surface}>
           <p className="font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase">
-            StockWiz · pipeline demo
+            Stockbrook · pipeline demo
           </p>
           <p className="font-mono text-xs text-white/40 mt-3 flex items-center gap-2">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-green animate-pulse motion-reduce:animate-none" />
@@ -141,7 +141,7 @@ export default function VerdictCard({ ticker, className = "" }: {
       >
         {/* Honesty label */}
         <p className="font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase mb-3">
-          StockWiz · pipeline demo
+          Stockbrook · pipeline demo
         </p>
 
         {/* Header — the ignited ticker */}

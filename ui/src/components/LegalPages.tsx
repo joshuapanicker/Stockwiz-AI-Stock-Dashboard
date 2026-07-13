@@ -41,7 +41,7 @@ export function TermsOfService({ open, onClose }: DocProps) {
   return (
     <LegalShell open={open} onClose={onClose} title="Terms of Service" updated="July 10, 2026">
       <p>
-        These Terms of Service ("Terms") govern your use of StockWiz (the "Service"),
+        These Terms of Service ("Terms") govern your use of Stockbrook (the "Service"),
         operated as an independent, personal project. By creating an account or
         using the Service, you agree to these Terms. If you don't agree, don't use
         the Service.
@@ -49,12 +49,12 @@ export function TermsOfService({ open, onClose }: DocProps) {
 
       <H2>1. Not Financial Advice</H2>
       <p>
-        StockWiz provides stock screening, portfolio tracking, and AI-generated
+        Stockbrook provides stock screening, portfolio tracking, and AI-generated
         commentary for informational and educational purposes only. Nothing on
         this Service — including AI analysis, buy/sell verdicts, price
         predictions, or the public AI track record — constitutes financial,
         investment, tax, or legal advice, or a recommendation to buy, sell, or
-        hold any security. StockWiz is not a registered investment adviser,
+        hold any security. Stockbrook is not a registered investment adviser,
         broker-dealer, or financial institution, and does not provide advice
         for compensation.
       </p>
@@ -76,7 +76,7 @@ export function TermsOfService({ open, onClose }: DocProps) {
 
       <H2>3. Limitation of Liability</H2>
       <p>
-        To the fullest extent permitted by law, StockWiz and its operator will
+        To the fullest extent permitted by law, Stockbrook and its operator will
         not be liable for any indirect, incidental, special, consequential, or
         punitive damages, or any loss of profits, revenue, or investment
         capital, arising from your use of (or inability to use) the Service —
@@ -95,9 +95,9 @@ export function TermsOfService({ open, onClose }: DocProps) {
 
       <H2>5. Brokerage Connections (Plaid)</H2>
       <p>
-        If you connect a brokerage account via Plaid, you authorize StockWiz to
+        If you connect a brokerage account via Plaid, you authorize Stockbrook to
         access read-only account and holdings data through Plaid's service to
-        power the portfolio tracker. StockWiz does not have the ability to
+        power the portfolio tracker. Stockbrook does not have the ability to
         place trades, move funds, or modify your brokerage account. Plaid's own
         terms and privacy practices also apply to that connection. Note: in
         its current form, brokerage connections use Plaid's sandbox
@@ -114,7 +114,7 @@ export function TermsOfService({ open, onClose }: DocProps) {
 
       <H2>7. Changes to the Service or Terms</H2>
       <p>
-        StockWiz is an evolving personal project. Features, pricing, and these
+        Stockbrook is an evolving personal project. Features, pricing, and these
         Terms may change at any time. Continued use after changes take effect
         constitutes acceptance of the updated Terms. If pricing changes affect
         your account, we'll aim to give reasonable notice.
@@ -142,8 +142,8 @@ export function PrivacyPolicy({ open, onClose }: DocProps) {
   return (
     <LegalShell open={open} onClose={onClose} title="Privacy Policy" updated="July 10, 2026">
       <p>
-        This Privacy Policy explains what information StockWiz collects, how
-        it's used, and your choices. StockWiz is a personal project operated
+        This Privacy Policy explains what information Stockbrook collects, how
+        it's used, and your choices. Stockbrook is a personal project operated
         by an individual developer, not a company with a dedicated legal or
         privacy team — but we take reasonable, good-faith steps to protect
         your data.
@@ -214,7 +214,7 @@ export function PrivacyPolicy({ open, onClose }: DocProps) {
       <H2>4. Data Security</H2>
       <p>
         Your data is protected with row-level security so that, by default,
-        only you (and StockWiz's backend) can access your account records.
+        only you (and Stockbrook's backend) can access your account records.
         Passwords are never stored by us directly — authentication is handled
         by Supabase. No method of transmission or storage is 100% secure, and
         we can't guarantee absolute security.

@@ -27,7 +27,7 @@ from lxml import html as lxml_html
 
 from core.cache import fetch_through
 
-_CONTACT = os.getenv("SEC_EDGAR_CONTACT", "StockWiz research@example.com")
+_CONTACT = os.getenv("SEC_EDGAR_CONTACT", "Stockbrook research@example.com")
 _HEADERS = {"User-Agent": _CONTACT}
 
 _TICKER_MAP_TTL = 7 * 86_400   # SEC's ticker list barely changes

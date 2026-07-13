@@ -174,7 +174,7 @@ export function usePortfolio() {
     // Immediately remove from active holdings in local state
     setData(prev => prev.filter((h: any) => h.symbol !== symbol));
     // Notify sold positions listeners to refresh
-    window.dispatchEvent(new CustomEvent("stockwiz:sold"));
+    window.dispatchEvent(new CustomEvent("stockbrook:sold"));
     load();
   }, [load]);
 
@@ -470,8 +470,8 @@ export function useSoldPositions() {
 
   // Re-fetch whenever a sell completes in usePortfolio
   useEffect(() => {
-    window.addEventListener("stockwiz:sold", load);
-    return () => window.removeEventListener("stockwiz:sold", load);
+    window.addEventListener("stockbrook:sold", load);
+    return () => window.removeEventListener("stockbrook:sold", load);
   }, [load]);
 
   return { data, loading, refresh: load };

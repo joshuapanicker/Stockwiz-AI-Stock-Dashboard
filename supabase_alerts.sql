@@ -1,5 +1,5 @@
 -- Run this in Supabase SQL Editor → New Query
--- Adds the alerts table to your existing StockWiz schema
+-- Adds the alerts table to your existing Stockbrook schema
 
 create table if not exists user_alerts (
   id           uuid primary key default gen_random_uuid(),

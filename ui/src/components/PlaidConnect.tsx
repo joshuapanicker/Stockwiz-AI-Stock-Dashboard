@@ -250,7 +250,7 @@ export default function PlaidConnect({ onHoldingsSynced, onHoldingsRemoved }: Pr
             <div className="text-xs leading-relaxed space-y-1.5">
               <p className="text-amber-400 font-semibold">Test mode — real brokerage accounts will not work</p>
               <p className="text-white/70">
-                StockWiz runs on Plaid's free Sandbox plan, which never connects to real institutions.
+                Stockbrook runs on Plaid's free Sandbox plan, which never connects to real institutions.
                 Signing in with your actual brokerage credentials will always fail.
               </p>
               <p className="text-white/70">
@@ -311,7 +311,7 @@ export default function PlaidConnect({ onHoldingsSynced, onHoldingsRemoved }: Pr
             <div className="flex-1">
               <p className="text-white font-semibold text-sm">No brokerage connected</p>
               <p className="text-muted text-xs mt-0.5">
-                Connect your brokerage to automatically sync your real holdings into StockWiz
+                Connect your brokerage to automatically sync your real holdings into Stockbrook
               </p>
             </div>
           </div>

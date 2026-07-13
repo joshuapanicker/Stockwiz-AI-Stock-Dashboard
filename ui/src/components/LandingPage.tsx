@@ -162,7 +162,7 @@ function BrowserFrame({ src, alt, className = "" }: { src: string; alt: string; 
         </div>
         <div className="flex-1 bg-card border border-border/40 rounded-md px-3 py-1 flex items-center gap-2 mx-4">
           <Monitor size={10} className="text-muted" />
-          <span className="text-[10px] text-muted">stockwiz.com</span>
+          <span className="text-[10px] text-muted">stockbrook.com</span>
         </div>
       </div>
       <img src={src} alt={alt} className="w-full block" />
@@ -322,7 +322,7 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
           <button type="button" onClick={onOpenTerms} className="text-muted hover:text-white underline">Terms</button>
           {" "}and{" "}
           <button type="button" onClick={onOpenPrivacy} className="text-muted hover:text-white underline">Privacy Policy</button>.
-          StockWiz does not provide financial advice.
+          Stockbrook does not provide financial advice.
         </p>
       )}
     </div>
@@ -379,7 +379,7 @@ function TerminalShot() {
           style={{ background: "radial-gradient(ellipse at 18% 60%, rgba(255,61,92,0.25), transparent 60%), radial-gradient(ellipse at 82% 40%, rgba(124,92,255,0.25), transparent 60%)" }} />
         <BrowserFrame
           src="/screenshots/dashboard.png"
-          alt="StockWiz dashboard - candlestick charts, screener signals, and streaming AI analysis"
+          alt="Stockbrook dashboard - candlestick charts, screener signals, and streaming AI analysis"
           className="relative"
         />
       </div>
@@ -420,7 +420,7 @@ export default function LandingPage() {
             style={{ background: "linear-gradient(135deg, rgba(255,61,92,0.16), rgba(124,92,255,0.16))", borderColor: "rgba(255,61,92,0.25)" }}>
             <TrendingUp size={16} className="text-red" />
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">StockWiz</span>
+          <span className="text-white font-bold text-lg tracking-tight">Stockbrook</span>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2">
           <MicroTicker />
@@ -697,11 +697,11 @@ export default function LandingPage() {
                 style={{ background: "linear-gradient(135deg, rgba(255,61,92,0.16), rgba(124,92,255,0.16))" }}>
                 <TrendingUp size={12} className="text-red" />
               </div>
-              <span className="text-white font-semibold text-sm">StockWiz</span>
+              <span className="text-white font-semibold text-sm">Stockbrook</span>
             </div>
             <MicroTicker />
           </div>
-          <p className="text-muted text-xs">© 2026 StockWiz · Not financial, investment, or tax advice. For informational purposes only. Past performance does not guarantee future results.</p>
+          <p className="text-muted text-xs">© 2026 Stockbrook · Not financial, investment, or tax advice. For informational purposes only. Past performance does not guarantee future results.</p>
           <div className="flex gap-6 text-xs text-muted">
             <button onClick={() => setPrivacyOpen(true)} className="hover:text-white transition-colors">Privacy</button>
             <button onClick={() => setTermsOpen(true)} className="hover:text-white transition-colors">Terms</button>

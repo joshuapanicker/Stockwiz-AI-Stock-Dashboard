@@ -1,4 +1,4 @@
-# StockWiz Landing Redesign — Design Plan
+# Stockbrook Landing Redesign — Design Plan
 
 *Plan only. No code changes until approved. Built against the frontend-design
 skill methodology: ground every choice in the subject matter, spend boldness
@@ -8,13 +8,13 @@ in one place, critique before building.*
 
 ## 1. The Concept: "Signal from Noise"
 
-The most characteristic thing in StockWiz's world is not a chart or a
+The most characteristic thing in Stockbrook's world is not a chart or a
 dashboard screenshot — it's **the moment 5,700 flickering tickers collapse
 into one clear verdict**. That's literally what the product does: universe →
 criteria engine → Claude reasoning → BUY/SELL, streamed token by token.
 
 The entire landing page is that pipeline, told once, cinematically, with
-**real data** — because unlike every competitor, StockWiz's backend can
+**real data** — because unlike every competitor, Stockbrook's backend can
 actually feed its own landing page (`/api/market`, universe signals, the
 public AI Track Record). No mockups. The page IS the product running.
 
@@ -190,7 +190,7 @@ Rules: active, specific, numbers over adjectives, zero filler.
 |---|---|
 | "AI-Powered Stock Intelligence" (badge) | `LIVE · reading 5,700 tickers` (mono badge, pulsing dot) |
 | "Screen smarter. Invest better. Act with clarity." | **"5,700 stocks. One verdict."** |
-| "Join other Investors on StockWiz" | "Every call graded in public — see the track record ↓" |
+| "Join other Investors on Stockbrook" | "Every call graded in public — see the track record ↓" |
 | "See it in action" | "How a verdict gets made" |
 | "Ready to invest smarter?" | "The market never stops talking. Hear what matters." |
 
@@ -198,7 +198,7 @@ Rules: active, specific, numbers over adjectives, zero filler.
 
 ## 8. Self-Critique (per the skill: is this plan specific to THIS product?)
 
-- ✅ The ticker-field hero is only possible because StockWiz *has* a live
+- ✅ The ticker-field hero is only possible because Stockbrook *has* a live
   universe API — a template couldn't ship it. Risk justified by subject.
 - ✅ Two-voice typography encodes the product's actual duality (data vs
   reasoning) — not an aesthetic imported from Dribbble.

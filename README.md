@@ -1,8 +1,8 @@
-# StockWiz
+# Stockbrook
 
 AI-powered stock screening, portfolio management, and brokerage sync dashboard.
 
-StockWiz combines live market data from Yahoo Finance with Claude AI to automate stock analysis and portfolio decisions. The backend is built in Python with FastAPI and exposes REST and Server-Sent Events (SSE) streaming endpoints. A custom criteria engine evaluates configurable buy, watch, and sell rules against real-time fundamentals — P/E ratios, revenue growth, profit margins, 52-week positioning, and market trend — classifying each stock automatically. Claude AI is integrated directly into the analysis pipeline, receiving live metrics as context and returning structured reasoning streamed token-by-token to the frontend. The frontend is a React + TypeScript SPA with a dark trading-terminal aesthetic, TradingView lightweight-charts for candlestick and technical charts, and Recharts for portfolio and allocation visualizations.
+Stockbrook combines live market data from Yahoo Finance with Claude AI to automate stock analysis and portfolio decisions. The backend is built in Python with FastAPI and exposes REST and Server-Sent Events (SSE) streaming endpoints. A custom criteria engine evaluates configurable buy, watch, and sell rules against real-time fundamentals — P/E ratios, revenue growth, profit margins, 52-week positioning, and market trend — classifying each stock automatically. Claude AI is integrated directly into the analysis pipeline, receiving live metrics as context and returning structured reasoning streamed token-by-token to the frontend. The frontend is a React + TypeScript SPA with a dark trading-terminal aesthetic, TradingView lightweight-charts for candlestick and technical charts, and Recharts for portfolio and allocation visualizations.
 
 **Live app:** [stockwiz.vercel.app](https://stockwiz-ai-stock-dashboard-five.vercel.app/)
 

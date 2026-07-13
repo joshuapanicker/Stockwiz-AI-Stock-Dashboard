@@ -664,7 +664,7 @@ export default function SettingsPage({ open, onClose, initialTab = "criteria", o
               <div className="mb-6">
                 <h2 className="text-white font-bold text-xl">Brokerage Connection</h2>
                 <p className="text-muted text-sm mt-1">
-                  Connect your brokerage account to automatically sync your real holdings into StockWiz.
+                  Connect your brokerage account to automatically sync your real holdings into Stockbrook.
                   Your credentials are never stored — Plaid handles authentication directly with your bank.
                 </p>
               </div>

@@ -13,7 +13,7 @@ import httpx
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", "joshua.panicker@gmail.com").strip()
-_FROM = "StockWiz <onboarding@resend.dev>"
+_FROM = "Stockbrook <onboarding@resend.dev>"
 
 
 def _send(subject: str, text: str) -> None:
@@ -32,8 +32,8 @@ def _send(subject: str, text: str) -> None:
 
 def send_signup_notification(email: str, created_at: str | None = None) -> None:
     when = f" at {created_at}" if created_at else ""
-    _send("New StockWiz signup", f"A new user just signed up: {email}{when}")
+    _send("New Stockbrook signup", f"A new user just signed up: {email}{when}")
 
 
 def send_signin_notification(email: str) -> None:
-    _send("StockWiz sign-in", f"{email} just signed in.")
+    _send("Stockbrook sign-in", f"{email} just signed in.")
