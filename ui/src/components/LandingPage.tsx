@@ -503,12 +503,11 @@ export default function LandingPage() {
                 </span>
               ))}
             </span>
-            <span className="block font-display font-bold tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
+            <span className="block font-display font-light tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
               {/* The judgment rises out of a clipped slot, shearing upright */}
               <span aria-hidden className="reveal-line">
                 <span style={{ "--ld": "480ms" } as React.CSSProperties}>
-                  <span className="text-white">One{"\u00A0"}</span>
-                  <span className="text-gradient-signal">verdict.</span>
+                  <span className="text-gradient-signal">One{"\u00A0"}verdict.</span>
                 </span>
               </span>
             </span>

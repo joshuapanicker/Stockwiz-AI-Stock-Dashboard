@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Jost:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Jost:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -159,7 +159,7 @@ html.has-custom-cursor [contenteditable="true"] {
   to   { background-position: 100% 50%; }
 }
 .text-gradient-signal {
-  background: linear-gradient(105deg, #F2F5F9 25%, #F2F5F9 42%, #A88FFF 68%, #6FBBFF 95%);
+  background: linear-gradient(105deg, #7C5CFF 8%, #A78BFA 45%, #5CC8FF 85%);
   background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
