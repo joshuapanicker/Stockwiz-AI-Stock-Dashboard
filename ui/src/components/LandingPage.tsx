@@ -470,8 +470,15 @@ export default function LandingPage() {
           <TickerField onIgnite={setIgnited} className="absolute inset-0 w-full h-full" />
         </div>
 
-        {/* The verdict card — where an ignited ticker becomes a decision */}
-        <VerdictCard ticker={ignited} className="hidden xl:block absolute right-10 bottom-32 z-10 anim-fade-in" />
+        {/* The verdict card — where an ignited ticker becomes a decision.
+            Deliberately peripheral: tucked into the corner, scaled down and
+            faded so it reads as ambient proof; hover brings it forward. */}
+        <div
+          className="hidden xl:block absolute right-4 bottom-16 z-10 anim-fade-in opacity-50 hover:opacity-100 transition-opacity duration-300"
+          style={{ transform: "scale(0.72)", transformOrigin: "bottom right" }}
+        >
+          <VerdictCard ticker={ignited} />
+        </div>
 
         <div className="relative flex-1 flex flex-col items-center justify-center text-center px-6 pt-14 pb-10 max-w-4xl mx-auto w-full">
 
@@ -508,7 +515,7 @@ export default function LandingPage() {
           </h1>
 
           <FadeIn direction="blur" delay={340}>
-            <p className="text-white/55 text-base md:text-lg leading-relaxed max-w-xl mb-10">
+            <p className="font-display text-white/55 text-base md:text-lg leading-relaxed max-w-xl mb-10">
               Live market data, your rules, and <span className="text-purple">Claude reasoning</span> over
               every position — in plain English, as it streams.
             </p>

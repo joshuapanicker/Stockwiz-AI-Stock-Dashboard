@@ -53,9 +53,11 @@ app = FastAPI(title="Stockbrook API")
 import re
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 # Matches the production Vercel domain (including preview deploys) + localhost.
+# Both the pre-rebrand (stockwiz) and renamed (stockbrook) project slugs are
+# allowed — Vercel 307s the old one to the new, but keep both to be safe.
 _ORIGIN_REGEX = os.getenv(
     "ALLOWED_ORIGIN_REGEX",
-    r"^https://stockwiz-ai-stock-dashboard[\w-]*\.vercel\.app$|^http://localhost:\d+$",
+    r"^https://stock(wiz|brook)-ai-stock-dashboard[\w-]*\.vercel\.app$|^http://localhost:\d+$",
 )
 app.add_middleware(
     CORSMiddleware,

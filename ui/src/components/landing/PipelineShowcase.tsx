@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import TickerLogo from "../TickerLogo";
 
 /**
  * "How a verdict gets made" — the pipeline, told as a 4-act scroll-scrubbed
@@ -87,11 +88,13 @@ function NoiseGrid({ deathProgress = 0 }: { deathProgress?: number }) {
               opacity: dead ? 0.14 : 1,
             }}
           >
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-center justify-between">
               <span
-                className={clsx("text-[11px] font-semibold", dead ? "line-through" : "")}
+                className={clsx("flex items-center gap-1.5 text-[11px] font-semibold", dead ? "line-through" : "")}
                 style={{ color: dead ? "rgba(255,255,255,0.35)" : "rgba(242,245,249,0.85)" }}
               >
+                <TickerLogo symbol={sym} size={14}
+                  className={dead ? "grayscale opacity-40" : ""} />
                 {sym}
               </span>
               {stamped && (

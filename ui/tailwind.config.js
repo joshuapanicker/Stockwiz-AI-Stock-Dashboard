@@ -20,9 +20,9 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
-        // Landing "judgment" voice — geometric display face that sits
+        // Landing "judgment" voice — squared techy display face that sits
         // naturally next to JetBrains Mono (data voice).
-        display: ['"Space Grotesk"', "Inter", "system-ui", "sans-serif"],
+        display: ['"Chakra Petch"', "Inter", "system-ui", "sans-serif"],
       },
     },
   },
