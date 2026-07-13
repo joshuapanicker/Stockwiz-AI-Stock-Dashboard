@@ -13,6 +13,39 @@ import TickerField, { type IgnitedTicker } from "./landing/TickerField";
 import VerdictCard from "./landing/VerdictCard";
 import PipelineShowcase from "./landing/PipelineShowcase";
 import TrackRecordLedger from "./landing/TrackRecordLedger";
+import { DataConstellation, CursorGlow, ScrollProgress, TickerTape } from "./landing/Atmosphere";
+
+// ── 3D tilt on hover — cards lean toward the cursor ───────────────────────
+
+function Tilt({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduced = typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function onMove(e: React.MouseEvent) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform =
+      `perspective(700px) rotateY(${px * 7}deg) rotateX(${-py * 7}deg) translateY(-3px)`;
+  }
+  function onLeave() {
+    const el = ref.current;
+    if (el) el.style.transform = "";
+  }
+
+  return (
+    <div ref={ref}
+      onMouseMove={reduced ? undefined : onMove}
+      onMouseLeave={reduced ? undefined : onLeave}
+      className="h-full will-change-transform"
+      style={{ transition: "transform 0.3s ease" }}>
+      {children}
+    </div>
+  );
+}
 
 // ── Magnetic wrapper — buttons lean toward the cursor, spring back ────────
 
@@ -298,8 +331,8 @@ function TerminalShot() {
       <FadeIn direction="up">
         <div className="text-center mb-12">
           <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">The terminal</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-white">
-            Where the verdicts <span className="italic">land.</span>
+          <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
+            Where the verdicts <span className="text-gradient-signal">land.</span>
           </h2>
         </div>
       </FadeIn>
@@ -333,12 +366,16 @@ export default function LandingPage() {
     <div className="min-h-screen text-white" style={{ background: "#06080D" }}>
       <style>{`body { overflow-x: hidden; }`}</style>
 
-      {/* Static ambience — quiet washes only; the hero carries its own
-          texture and all motion budget is reserved for the ticker field. */}
+      {/* Page-wide atmosphere: quiet washes + the data constellation that
+          runs behind every section, the cursor lens that follows the
+          pointer everywhere, and the scroll progress hairline. */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46,230,168,0.07) 0%, transparent 60%)" }} />
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 50% 40% at 100% 70%, rgba(128,85,245,0.06) 0%, transparent 55%)" }} />
       </div>
+      <DataConstellation />
+      <CursorGlow />
+      <ScrollProgress />
 
       {/* ── NAV — glass bar with live market pulse ── */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-8 py-4 border-b border-white/[0.06] bg-white/[0.02] backdrop-blur-md">
@@ -395,18 +432,21 @@ export default function LandingPage() {
             </div>
           </FadeIn>
 
-          {/* Two voices: the market speaks in mono, the judgment in serif. */}
+          {/* Two voices: the market speaks in mono (letter-staggered in),
+              the judgment lands in Space Grotesk with a drifting signal
+              gradient. */}
           <h1 className="mb-8">
-            <FadeIn direction="up" delay={100}>
-              <span className="block font-mono text-xl md:text-2xl tracking-[0.28em] text-white/55 uppercase mb-5">
-                5,700 stocks.
-              </span>
-            </FadeIn>
-            <FadeIn direction="up" delay={220}>
-              <span className="block font-serif italic text-6xl md:text-8xl leading-[1.02] text-white">
-                One verdict.
-              </span>
-            </FadeIn>
+            <span className="block font-mono text-xl md:text-2xl tracking-[0.28em] text-white/55 uppercase mb-5" aria-label="5,700 stocks.">
+              {"5,700 stocks.".split("").map((ch, i) => (
+                <span key={i} aria-hidden className="reveal-char" style={{ "--ci": i } as React.CSSProperties}>
+                  {ch === " " ? "\u00A0" : ch}
+                </span>
+              ))}
+            </span>
+            <span className="block font-display font-bold tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
+              <span aria-hidden className="reveal-char text-white" style={{ "--ci": 15 } as React.CSSProperties}>One{"\u00A0"}</span>
+              <span aria-hidden className="reveal-char text-gradient-signal" style={{ "--ci": 18 } as React.CSSProperties}>verdict.</span>
+            </span>
           </h1>
 
           <FadeIn direction="up" delay={340}>
@@ -445,6 +485,9 @@ export default function LandingPage() {
         </FadeIn>
       </section>
 
+      {/* ── THE TAPE — the market runs through the page ── */}
+      <TickerTape />
+
       {/* ── THE PIPELINE — scroll-scrubbed 4-act sequence ── */}
       <section id="features" className="relative z-10">
         <PipelineShowcase />
@@ -461,8 +504,8 @@ export default function LandingPage() {
         <FadeIn direction="up">
           <div className="text-center mb-12">
             <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Instruments</p>
-            <h2 className="font-serif text-4xl md:text-5xl text-white">
-              Six instruments, <span className="italic">one terminal.</span>
+            <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
+              Six instruments, <span className="text-gradient-signal">one terminal.</span>
             </h2>
           </div>
         </FadeIn>
@@ -476,13 +519,15 @@ export default function LandingPage() {
             { icon: <Star size={17}/>,        title: "90-Day Prediction",       desc: "Bull/base/bear price projections generated by Claude from recent momentum and fundamentals.", delay: 120 },
           ].map(({ icon, title, desc, delay }) => (
             <FadeIn key={title} direction="up" delay={delay}>
-              <div className="glass-card border border-white/[0.07] rounded-2xl p-5 hover:border-green/25 transition-colors group">
-                <div className="w-9 h-9 rounded-xl bg-green/10 border border-green/20 flex items-center justify-center mb-4 text-green group-hover:bg-green/15 transition-colors">
-                  {icon}
+              <Tilt>
+                <div className="glass-card border border-white/[0.07] rounded-2xl p-5 hover:border-green/25 transition-colors group h-full">
+                  <div className="w-9 h-9 rounded-xl bg-green/10 border border-green/20 flex items-center justify-center mb-4 text-green group-hover:bg-green/15 transition-colors">
+                    {icon}
+                  </div>
+                  <p className="font-mono text-xs tracking-[0.12em] uppercase text-white mb-2">{title}</p>
+                  <p className="text-muted text-xs leading-relaxed">{desc}</p>
                 </div>
-                <p className="font-mono text-xs tracking-[0.12em] uppercase text-white mb-2">{title}</p>
-                <p className="text-muted text-xs leading-relaxed">{desc}</p>
-              </div>
+              </Tilt>
             </FadeIn>
           ))}
         </div>
@@ -493,8 +538,8 @@ export default function LandingPage() {
         <FadeIn direction="up">
           <div className="text-center mb-12">
             <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Pricing</p>
-            <h2 className="font-serif text-4xl md:text-5xl text-white">
-              Simple pricing, <span className="italic">no surprises.</span>
+            <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
+              Simple pricing, <span className="text-gradient-signal">no surprises.</span>
             </h2>
           </div>
         </FadeIn>
@@ -546,9 +591,9 @@ export default function LandingPage() {
           <div className="relative overflow-hidden bg-gradient-to-br from-green/8 to-purple-500/5 border border-green/15 rounded-3xl px-8 py-14 text-center">
             <div aria-hidden className="absolute inset-0 landing-grid-texture opacity-50 pointer-events-none" />
             <div className="relative">
-              <h2 className="font-serif text-4xl md:text-5xl text-white mb-3 leading-tight">
+              <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white mb-3 leading-tight">
                 The market never stops talking.
-                <span className="block italic mt-1">Hear what matters.</span>
+                <span className="block text-gradient-signal mt-1">Hear what matters.</span>
               </h2>
               <p className="text-muted mb-10 max-w-md mx-auto text-sm">
                 Free account, 200K AI tokens a month, every verdict graded in public.
@@ -560,6 +605,9 @@ export default function LandingPage() {
           </div>
         </FadeIn>
       </section>
+
+      {/* ── THE TAPE, again — bookend ── */}
+      <TickerTape />
 
       {/* ── FOOTER ── */}
       <footer className="relative z-10 border-t border-border/20 px-8 py-8">

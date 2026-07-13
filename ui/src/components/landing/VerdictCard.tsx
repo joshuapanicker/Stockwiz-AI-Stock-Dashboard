@@ -101,10 +101,18 @@ export default function VerdictCard({ ticker, className = "" }: {
     return () => { timers.current.forEach(clearTimeout); timers.current = []; };
   }, [ticker?.symbol]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Near-opaque surface: the flickering field behind must never bleed
+  // through the card's text.
+  const surface: React.CSSProperties = {
+    background: "rgba(9, 12, 18, 0.94)",
+    backdropFilter: "blur(18px)",
+    WebkitBackdropFilter: "blur(18px)",
+  };
+
   if (!ticker || !script) {
     return (
       <div className={className}>
-        <div className="glass-card border border-white/10 rounded-2xl px-5 py-4 w-[340px]">
+        <div className="border border-white/10 rounded-2xl px-5 py-4 w-[340px]" style={surface}>
           <p className="font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase">
             StockWiz · pipeline demo
           </p>
@@ -123,10 +131,13 @@ export default function VerdictCard({ ticker, className = "" }: {
   return (
     <div className={className}>
       <div
-        className="glass-card border border-white/10 rounded-2xl px-5 py-4 w-[340px] transition-shadow duration-500"
-        style={verdictLanded && script.buy
-          ? { boxShadow: "0 0 42px rgba(46,230,168,0.12), 0 18px 40px rgba(0,0,0,0.5)" }
-          : { boxShadow: "0 18px 40px rgba(0,0,0,0.5)" }}
+        className="border border-white/10 rounded-2xl px-5 py-4 w-[340px] transition-shadow duration-500"
+        style={{
+          ...surface,
+          ...(verdictLanded && script.buy
+            ? { boxShadow: "0 0 42px rgba(46,230,168,0.12), 0 18px 40px rgba(0,0,0,0.5)" }
+            : { boxShadow: "0 18px 40px rgba(0,0,0,0.5)" }),
+        }}
       >
         {/* Honesty label */}
         <p className="font-mono text-[10px] tracking-[0.2em] text-white/30 uppercase mb-3">
@@ -172,10 +183,11 @@ export default function VerdictCard({ ticker, className = "" }: {
           )}
         </div>
 
-        {/* Claude reasoning — serif italic, violet caret, typed */}
+        {/* Claude reasoning — plain English (the product's promise), violet
+            caret, typed */}
         <div className="mt-3 min-h-[72px]">
           {(phase === "reasoning" || phase === "verdict") && (
-            <p className="font-serif italic text-[15px] leading-relaxed text-white/80">
+            <p className="text-[13.5px] leading-relaxed text-white/80">
               {script.reasoning.slice(0, typedChars)}
               {phase === "reasoning" && (
                 <span className="inline-block w-[7px] h-[15px] bg-purple ml-0.5 align-middle animate-pulse motion-reduce:animate-none" />

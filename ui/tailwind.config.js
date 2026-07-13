@@ -20,8 +20,9 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
-        // Landing "judgment" voice — data is mono, reasoning is serif.
-        serif: ['"Instrument Serif"', "Georgia", "serif"],
+        // Landing "judgment" voice — geometric display face that sits
+        // naturally next to JetBrains Mono (data voice).
+        display: ['"Space Grotesk"', "Inter", "system-ui", "sans-serif"],
       },
     },
   },

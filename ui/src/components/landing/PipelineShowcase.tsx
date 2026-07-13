@@ -206,7 +206,7 @@ function ReasoningCard({ p }: { p: number }) {
         </div>
 
         {/* Streaming reasoning — scrubbed by scroll */}
-        <p className="font-serif italic text-lg leading-relaxed text-white/85 min-h-[120px]">
+        <p className="text-[15px] leading-relaxed text-white/85 min-h-[110px]">
           {REASONING_TEXT.slice(0, chars)}
           {typing && <span className="inline-block w-[8px] h-[17px] bg-purple ml-0.5 align-middle" />}
         </p>
@@ -239,7 +239,7 @@ function VerdictAct({ p, onSeeLedger }: { p: number; onSeeLedger: () => void }) 
       </div>
 
       <p
-        className="font-serif italic text-2xl md:text-3xl text-white/85 mt-10 max-w-md"
+        className="font-display font-medium text-2xl md:text-3xl text-white/85 mt-10 max-w-md"
         style={{ opacity: lineIn, transform: `translateY(${(1 - lineIn) * 16}px)` }}
       >
         …and we remember every call we make.
@@ -309,8 +309,8 @@ export default function PipelineShowcase() {
   const header = (
     <div className="text-center mb-4">
       <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">The pipeline</p>
-      <h2 className="font-serif text-4xl md:text-5xl text-white">
-        How a verdict <span className="italic">gets made.</span>
+      <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
+        How a verdict <span className="text-gradient-signal">gets made.</span>
       </h2>
     </div>
   );

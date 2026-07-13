@@ -158,7 +158,10 @@ export default function TickerField({ onIgnite, className = "" }: Props) {
         const dist = Math.sqrt(dx * dx + dy * dy);
         const prox = Math.max(0, 1 - dist / SPOT_RADIUS); // 0..1 inside lens
 
-        let bright = 0.14 + prox * 0.62 + cell.flash * 0.35;
+        // The lens does the revealing: cells rest near-dark (0.055) and only
+        // wake under the spotlight. Flicker flashes are likewise proximity-
+        // gated so the field's edges stay calm instead of shimmering.
+        let bright = 0.055 + prox * 0.8 + cell.flash * (0.05 + prox * 0.45);
         if (cell.flash > 0) cell.flash = Math.max(0, cell.flash - 0.06);
 
         const isIgnited = igniteCell === cell && now - igniteAt < 1400;

@@ -82,13 +82,31 @@ export default function TrackRecordLedger() {
       >
         <div className="text-center mb-4">
           <p className="font-mono text-[11px] tracking-[0.28em] text-green uppercase mb-3">Track record</p>
-          <h2 className="font-serif text-4xl md:text-5xl text-white">
-            We grade <span className="italic">our own calls.</span>
+          <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
+            The AI grades <span className="text-gradient-signal">its own calls.</span>
           </h2>
-          <p className="font-serif italic text-lg text-white/50 mt-5 max-w-lg mx-auto leading-relaxed">
-            "Every verdict is logged with the price at that moment.
-            Then reality grades it — against the market, in public."
+          <p className="text-white/55 text-sm md:text-base mt-5 max-w-xl mx-auto leading-relaxed">
+            Inside the app, Claude issues buy and sell verdicts on real stocks.
+            Every verdict is frozen here the moment it's made — then scored against
+            what the market actually did, benchmarked to SPY. Nothing edited, nothing deleted.
           </p>
+        </div>
+
+        {/* How the grading works — three steps, so the ledger explains itself */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-8">
+          {[
+            { n: "01", t: "Verdict issued",  d: "Claude calls BUY or SELL — the stock price is logged at that exact moment" },
+            { n: "02", t: "Time passes",     d: "No edits allowed. The call sits in the ledger for 30, 90, then 180 days" },
+            { n: "03", t: "Reality grades it", d: "Actual return vs SPY is stamped on — wins in green, losses in red" },
+          ].map(s => (
+            <div key={s.n} className="flex items-start gap-3 border border-white/[0.07] rounded-xl px-4 py-3.5 bg-white/[0.015]">
+              <span className="font-mono text-lg font-bold text-green/40">{s.n}</span>
+              <div>
+                <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-white/80">{s.t}</p>
+                <p className="text-white/45 text-xs leading-relaxed mt-1">{s.d}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Summary tiles */}
@@ -128,9 +146,9 @@ export default function TrackRecordLedger() {
                 {loading ? "Opening the ledger…" : "Ledger open — awaiting first graded calls"}
               </p>
               {!loading && (
-                <p className="font-serif italic text-white/40 text-base mt-3 max-w-sm mx-auto">
-                  Grades land 30 days after each verdict. Nothing gets edited,
-                  nothing gets deleted — the wins and the losses both stay.
+                <p className="text-white/40 text-sm mt-3 max-w-sm mx-auto leading-relaxed">
+                  The scoreboard is live — every AI verdict issued in the app lands
+                  here, and its first grade arrives 30 days later. Wins and losses both stay.
                 </p>
               )}
             </div>
