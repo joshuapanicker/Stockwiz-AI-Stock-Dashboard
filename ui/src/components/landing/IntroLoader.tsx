@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
 /**
- * Intro loader — the curtain before the landing page. Plain black screen,
- * the Stockbrook spark mark draws itself on in neon heat (same gradient as
- * the primary CTA), "STOCKBROOK" staggers in beneath it in the mono badge
+ * Intro loader — the curtain before the dashboard. Plain black screen,
+ * the StockWiz spark mark draws itself on in neon heat (same gradient as
+ * the primary CTA), "STOCKWIZ" staggers in beneath it in the mono badge
  * voice, then the whole curtain wipes upward and hands the page over.
  *
  * Timeline (ms):
@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
  * prefers-reduced-motion: skips entirely (onReveal immediately, no overlay).
  */
 
-const WORD = "STOCKBROOK";
+const WORD = "STOCKWIZ";
 
 export default function IntroLoader({ onReveal }: { onReveal: () => void }) {
   const [phase, setPhase] = useState<"draw" | "wipe" | "gone">("draw");
