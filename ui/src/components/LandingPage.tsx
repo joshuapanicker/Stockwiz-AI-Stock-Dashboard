@@ -3,7 +3,7 @@ import clsx from "clsx";
 import {
   TrendingUp, BarChart2, Bot, Zap, ShieldCheck, ChevronRight,
   Star, ArrowRight, Eye, EyeOff, Mail, Lock, Loader2,
-  AlertCircle, CheckCircle, Monitor,
+  AlertCircle, CheckCircle,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useInView } from "../hooks/useInView";
@@ -147,28 +147,6 @@ function FadeIn({ children, delay = 0, direction = "up", className = "" }: {
       ].filter(Boolean).join(", "),
     }}>
       {children}
-    </div>
-  );
-}
-
-// ── Browser frame mockup ──────────────────────────────────────────────────
-
-function BrowserFrame({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
-  return (
-    <div className={clsx("rounded-2xl overflow-hidden border border-border/60 shadow-2xl", className)}>
-      {/* Chrome bar */}
-      <div className="bg-card2 border-b border-border/50 px-4 py-2.5 flex items-center gap-2">
-        <div className="flex gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-red/60" />
-          <div className="w-3 h-3 rounded-full bg-orange/60" />
-          <div className="w-3 h-3 rounded-full bg-green/60" />
-        </div>
-        <div className="flex-1 bg-card border border-border/40 rounded-md px-3 py-1 flex items-center gap-2 mx-4">
-          <Monitor size={10} className="text-muted" />
-          <span className="text-[10px] text-muted">stockbrook.com</span>
-        </div>
-      </div>
-      <img src={src} alt={alt} className="w-full block" />
     </div>
   );
 }
@@ -329,64 +307,6 @@ function AuthForm({ onOpenTerms, onOpenPrivacy }: { onOpenTerms: () => void; onO
         </p>
       )}
     </div>
-  );
-}
-
-// ── The terminal — one real product shot, gentle parallax ─────────────────
-
-function TerminalShot() {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let rafId = 0;
-    let ticking = false;
-
-    function apply() {
-      ticking = false;
-      const el = ref.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const center = r.top + r.height / 2 - window.innerHeight / 2;
-      // The screenshot lies back below the fold and stands upright as it
-      // reaches center — a scroll-scrubbed 3D reveal, not a slide.
-      const tilt = Math.max(-4, Math.min(14, center * 0.02));
-      const lift = Math.max(-30, Math.min(30, -center * 0.04));
-      el.style.transform = `perspective(1400px) rotateX(${tilt}deg) translateY(${lift}px)`;
-    }
-
-    function onScroll() {
-      if (!ticking) { ticking = true; rafId = requestAnimationFrame(apply); }
-    }
-    window.addEventListener("scroll", onScroll, { passive: true });
-    apply();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(rafId);
-    };
-  }, []);
-
-  return (
-    <section className="relative z-10 px-6 md:px-8 py-20 max-w-6xl mx-auto">
-      <FadeIn direction="blur">
-        <div className="text-center mb-12">
-          <p className="font-mono text-[11px] tracking-[0.28em] text-red uppercase mb-3"><GlitchText text="The terminal" /></p>
-          <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
-            Where the verdicts <span className="text-gradient-signal">land.</span>
-          </h2>
-        </div>
-      </FadeIn>
-      <div ref={ref} className="relative will-change-transform" style={{ transformStyle: "preserve-3d" }}>
-        {/* Dual glow — heat from the left, signal from the right */}
-        <div className="absolute -inset-6 rounded-3xl blur-3xl opacity-30 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at 18% 60%, rgba(255,61,92,0.25), transparent 60%), radial-gradient(ellipse at 82% 40%, rgba(124,92,255,0.25), transparent 60%)" }} />
-        <BrowserFrame
-          src="/screenshots/dashboard.png"
-          alt="Stockbrook dashboard - candlestick charts, screener signals, and streaming AI analysis"
-          className="relative"
-        />
-      </div>
-    </section>
   );
 }
 
@@ -566,10 +486,9 @@ export default function LandingPage() {
         <PipelineShowcase />
       </section>
 
-      {/* ── THE TERMINAL — one real product shot, parallax ── */}
-      <TerminalShot />
-
-      {/* ── LIVE DEMO — real screen recording, scroll scrubs playback ── */}
+      {/* ── THE TERMINAL — the live demo reel IS the product shot now:
+             "Where the verdicts land." pinned over the scroll-scrubbed
+             recording of Dashboard → Portfolio → Market Chat ── */}
       <AppShowcase />
 
       {/* ── THE VERDICT WALL — giant type interlude, scroll-sheared ── */}

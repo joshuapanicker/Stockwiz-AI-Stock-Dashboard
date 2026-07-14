@@ -1,29 +1,30 @@
 import { useEffect, useRef, useState } from "react";
+import { Monitor } from "lucide-react";
 import { GlitchText } from "./Effects";
 
 /**
- * "Every tab, one scroll" — a single 43s screen recording of the real app
- * (Dashboard -> Portfolio -> Market Chat), pinned and scroll-scrubbed like
- * the pipeline/instruments sections: vertical scroll position IS playback
- * position, so scrubbing back rewinds. Chapter labels and a segmented
- * progress bar track which tab is currently on screen.
+ * "Where the verdicts land" — the terminal section, now a live demo reel
+ * instead of a static screenshot. A single 43s screen recording of the real
+ * app (Dashboard -> Portfolio -> Market Chat), pinned and scroll-scrubbed.
  *
- * The <video> itself is never told to play/pause — currentTime is written
- * directly every frame while paused, which is the standard scroll-scrub
- * technique and means no audio ever engages.
+ * Scrubbing is INERTIAL, not direct: scroll sets a target time, and a
+ * continuous rAF loop eases playback toward it (exponential approach), so
+ * releasing the wheel lets the footage glide to a stop instead of freezing
+ * mid-frame. The loop also refuses to issue a new seek while the previous
+ * one is still decoding — hammering currentTime mid-seek is what reads as
+ * "low framerate".
  *
- * Lazy-mounted: the 26MB file isn't fetched until the section is within
- * 400px of the viewport. prefers-reduced-motion shows a single static
- * frame (first chapter) with no scrub.
+ * Lazy-mounted: the ~26MB file isn't fetched until the section is within
+ * 600px of the viewport. prefers-reduced-motion: static first frame.
  */
 
 const CHAPTERS = [
-  { label: "Dashboard",    start: 0,     end: 18.04,     color: "#FF5C7A" }, // heat red
-  { label: "Portfolio",    start: 18.05, end: 32.67,     color: "#8055F5" }, // signal violet
-  { label: "Market Chat",  start: 32.68, end: Infinity,  color: "#3FA7FC" }, // sky
+  { label: "Dashboard",   start: 0,     end: 18.04,    color: "#FF5C7A" }, // heat red
+  { label: "Portfolio",   start: 18.05, end: 32.67,    color: "#8055F5" }, // signal violet
+  { label: "Market Chat", start: 32.68, end: Infinity, color: "#3FA7FC" }, // sky
 ];
 
-const FALLBACK_DURATION = 43;
+const FALLBACK_DURATION = 43.7;
 
 export default function AppShowcase() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -39,7 +40,7 @@ export default function AppShowcase() {
     if (!section) return;
     const io = new IntersectionObserver(
       entries => { if (entries[0]?.isIntersecting) { setMounted(true); io.disconnect(); } },
-      { rootMargin: "400px" },
+      { rootMargin: "600px" },
     );
     io.observe(section);
     return () => io.disconnect();
@@ -53,8 +54,11 @@ export default function AppShowcase() {
 
     let duration = FALLBACK_DURATION;
     let rafId = 0;
-    let ticking = false;
     let disposed = false;
+    let visible = true;
+    let smooth = 0;       // eased playback position (seconds)
+    let target = 0;       // where scroll wants playback to be
+    let lastActive = -1;
 
     function onMeta() {
       if (video && isFinite(video.duration) && video.duration > 0) duration = video.duration;
@@ -64,54 +68,69 @@ export default function AppShowcase() {
     video.addEventListener("loadedmetadata", onMeta);
     video.addEventListener("canplay", onCanPlay);
 
-    function apply() {
-      ticking = false;
+    const vio = new IntersectionObserver(
+      entries => { visible = entries[0]?.isIntersecting ?? true; },
+      { rootMargin: "100px" },
+    );
+    vio.observe(section);
+
+    function tick() {
       if (disposed) return;
+      rafId = requestAnimationFrame(tick);
+      if (!visible || document.hidden) return;
+
+      // Scroll -> target time (reading rects each frame keeps the math
+      // honest through resizes and layout shifts)
       const r = section!.getBoundingClientRect();
       const vh = window.innerHeight;
       const span = r.height - vh;
       const p = span > 0 ? Math.max(0, Math.min(1, -r.top / span)) : 0;
+      target = p * duration;
 
-      if (video!.readyState >= 1) {
-        const t = p * duration;
-        if (Math.abs(video!.currentTime - t) > 0.05) video!.currentTime = t;
-        const idx = CHAPTERS.findIndex(c => t >= c.start && t < c.end);
-        if (idx !== -1) setActiveIdx(idx);
+      // Inertial approach: playback glides toward the target and eases to
+      // a stop after the wheel is released, instead of snapping
+      smooth += (target - smooth) * 0.085;
+      if (Math.abs(target - smooth) < 0.004) smooth = target;
+
+      // One seek in flight at a time — re-seeking mid-decode causes the
+      // steppy "low framerate" look
+      if (video!.readyState >= 2 && !video!.seeking &&
+          Math.abs(video!.currentTime - smooth) > 0.02) {
+        video!.currentTime = smooth;
       }
 
-      barRefs.current.forEach((el, i) => {
-        if (!el) return;
+      // Chapter label + segmented bars follow the eased time, so they
+      // decelerate with the footage
+      const idx = CHAPTERS.findIndex(c => smooth >= c.start && smooth < c.end);
+      if (idx !== -1 && idx !== lastActive) { lastActive = idx; setActiveIdx(idx); }
+
+      for (let i = 0; i < CHAPTERS.length; i++) {
+        const el = barRefs.current[i];
+        if (!el) continue;
         const c = CHAPTERS[i];
-        const segStart = c.start / duration;
-        const segEnd = Math.min(1, c.end / duration);
-        const local = segEnd > segStart
-          ? Math.max(0, Math.min(1, (p - segStart) / (segEnd - segStart)))
+        const end = Math.min(duration, c.end);
+        const local = end > c.start
+          ? Math.max(0, Math.min(1, (smooth - c.start) / (end - c.start)))
           : 0;
         el.style.transform = `scaleX(${local})`;
-      });
-    }
-
-    function onScroll() {
-      if (!ticking) { ticking = true; rafId = requestAnimationFrame(apply); }
+      }
     }
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       return () => {
         video.removeEventListener("loadedmetadata", onMeta);
         video.removeEventListener("canplay", onCanPlay);
+        vio.disconnect();
       };
     }
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    apply();
+    rafId = requestAnimationFrame(tick);
     return () => {
       disposed = true;
+      cancelAnimationFrame(rafId);
       video.removeEventListener("loadedmetadata", onMeta);
       video.removeEventListener("canplay", onCanPlay);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      cancelAnimationFrame(rafId);
+      vio.disconnect();
     };
   }, [mounted]);
 
@@ -119,11 +138,11 @@ export default function AppShowcase() {
     <section ref={sectionRef} className="relative z-10" style={{ height: "340vh" }}>
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-6">
         <div className="text-center mb-7 max-w-2xl">
-          <p className="font-mono text-[11px] tracking-[0.28em] text-sky uppercase mb-3">
-            <GlitchText text="See it live" />
+          <p className="font-mono text-[11px] tracking-[0.28em] text-red uppercase mb-3">
+            <GlitchText text="The terminal" />
           </p>
           <h2 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-white">
-            Every tab, <span className="text-gradient-signal">one scroll.</span>
+            Where the verdicts <span className="text-gradient-signal">land.</span>
           </h2>
         </div>
 
@@ -137,13 +156,20 @@ export default function AppShowcase() {
           ))}
         </div>
 
-        {/* The video, framed like the app's own browser chrome */}
+        {/* The reel, framed in the app's own browser chrome */}
         <div className="relative w-full max-w-5xl rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
           style={{ aspectRatio: "16/9", background: "#10131A" }}>
-          <div className="absolute inset-x-0 top-0 z-10 h-9 bg-[#171C29]/95 border-b border-white/10 flex items-center gap-1.5 px-4">
-            <div className="w-2.5 h-2.5 rounded-full bg-red/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-orange/60" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green/60" />
+          <div className="absolute inset-x-0 top-0 z-10 h-9 bg-[#171C29]/95 border-b border-white/10 flex items-center gap-2 px-4">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-orange/60" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green/60" />
+            </div>
+            <div className="flex-1 max-w-xs mx-auto bg-card border border-border/40 rounded-md px-3 py-0.5 flex items-center justify-center gap-2">
+              <Monitor size={10} className="text-muted" />
+              <span className="text-[10px] text-muted">stockbrook.com</span>
+            </div>
+            <div className="w-16" aria-hidden />
           </div>
           {mounted && (
             <video
@@ -161,9 +187,9 @@ export default function AppShowcase() {
 
         {/* Segmented scrub bar — one colored fill per chapter */}
         <div className="flex gap-1 w-full max-w-5xl mt-4" aria-hidden>
-          {CHAPTERS.map((c, i) => (
+          {CHAPTERS.map(c => (
             <div key={c.label} className="h-[3px] flex-1 rounded-full overflow-hidden bg-white/10">
-              <div ref={el => { barRefs.current[i] = el; }} className="h-full origin-left"
+              <div ref={el => { barRefs.current[CHAPTERS.indexOf(c)] = el; }} className="h-full origin-left"
                 style={{ transform: "scaleX(0)", background: c.color }} />
             </div>
           ))}
