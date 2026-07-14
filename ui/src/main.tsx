@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { Analytics } from "@vercel/analytics/react";
 import App from "./App";
@@ -10,28 +10,15 @@ import "./index.css";
 
 function Root() {
   const { user, loading } = useAuth();
-  // The intro curtain plays when someone freshly signs in — email login,
-  // signup, or OAuth return. A restored session on a normal page reload
-  // skips it so returning users go straight to the dashboard.
-  const wasSignedOut = useRef(false);
-  const isOAuthReturn = useRef(
-    typeof window !== "undefined" && window.location.hash.includes("access_token"),
-  );
-  const [intro, setIntro] = useState(false);
+  // Always show the intro splash on every page load / reload
+  const [intro, setIntro] = useState(true);
 
+  // Once auth finishes loading, if user is signed in the intro is already
+  // playing (mounted from the start). If not signed in, hide it so the
+  // landing page shows immediately.
   useEffect(() => {
     if (loading) return;
-    if (!user) {
-      // User is on the landing/auth page — mark that we saw them signed out
-      wasSignedOut.current = true;
-      return;
-    }
-    // User is now signed in
-    if (wasSignedOut.current || isOAuthReturn.current) {
-      wasSignedOut.current = false;
-      isOAuthReturn.current = false;
-      setIntro(true);
-    }
+    if (!user) setIntro(false);
   }, [user, loading]);
 
   if (loading) {
