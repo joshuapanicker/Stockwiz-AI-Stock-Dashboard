@@ -164,7 +164,7 @@ html.has-custom-cursor [contenteditable="true"] {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: gradientDrift 7s ease-in-out infinite alternate;
+  animation: gradientDrift 3s ease-in-out infinite alternate;
 }
 .text-gradient-heat {
   background: linear-gradient(100deg, #FF3D5C 5%, #FF5C7A 35%, #FF7A3D 70%, #FFB03D 95%);
@@ -180,7 +180,7 @@ html.has-custom-cursor [contenteditable="true"] {
 .reveal-char.text-gradient-signal {
   animation:
     charUp 0.7s cubic-bezier(0.2, 0.75, 0.25, 1) both,
-    gradientDrift 7s ease-in-out infinite alternate;
+    gradientDrift 3s ease-in-out infinite alternate;
   animation-delay: calc(var(--ci) * 42ms + 250ms), 0s;
 }
 

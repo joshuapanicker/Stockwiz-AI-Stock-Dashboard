@@ -87,9 +87,9 @@ export default function AppShowcase() {
       const p = span > 0 ? Math.max(0, Math.min(1, -r.top / span)) : 0;
       target = p * duration;
 
-      // Inertial approach: playback glides toward the target and eases to
-      // a stop after the wheel is released, instead of snapping
-      smooth += (target - smooth) * 0.085;
+      // Light internal ease — page scroll itself is inertial (SmoothWheel),
+      // so this mostly decimates seeks rather than adding a second lag
+      smooth += (target - smooth) * 0.16;
       if (Math.abs(target - smooth) < 0.004) smooth = target;
 
       // One seek in flight at a time — re-seeking mid-decode causes the

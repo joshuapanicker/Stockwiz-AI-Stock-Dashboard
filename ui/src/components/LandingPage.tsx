@@ -18,7 +18,7 @@ import WireTerrain from "./landing/WireTerrain";
 import IntroLoader from "./landing/IntroLoader";
 import InstrumentsRail, { INSTRUMENTS } from "./landing/InstrumentsRail";
 import AppShowcase from "./landing/AppShowcase";
-import { GlitchText, ScrambleLink, VelocityWarp, SpotlightCard, ScrollFillText } from "./landing/Effects";
+import { GlitchText, ScrambleLink, SmoothWheel, SpotlightCard, ScrollFillText } from "./landing/Effects";
 import { DataConstellation, CursorGlow, ScrollProgress, TickerTape, AmbientWashes } from "./landing/Atmosphere";
 
 // ── 3D tilt on hover — cards lean toward the cursor ───────────────────────
@@ -370,10 +370,10 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Everything below the nav rides the velocity warp — the page
-          shears fractionally with scroll speed and springs back at rest,
-          so fast scrolling feels like pulling against something physical. */}
-      <VelocityWarp>
+      {/* Wheel scrolling is inertial page-wide: input moves a target and
+          the real scroll position eases toward it, so the page glides to a
+          stop and every scroll-driven section inherits the easing. */}
+      <SmoothWheel />
 
       {/* ── HERO — Act 0: the noise ──
           Full-viewport stage for the live ticker field. Phase 1 ships the
@@ -627,8 +627,6 @@ export default function LandingPage() {
 
       {/* ── THE TAPE, again — but hot: the editorial red band ── */}
       <TickerTape hot />
-
-      </VelocityWarp>
 
       {/* ── FOOTER ── */}
       <footer className="relative z-10 border-t border-border/20 px-8 py-8">

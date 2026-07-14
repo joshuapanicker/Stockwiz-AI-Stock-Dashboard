@@ -153,6 +153,86 @@ export function ScrollFillText({ text, className = "" }: { text: string; classNa
   );
 }
 
+// ── Smooth wheel — page-level scroll inertia ───────────────────────────────
+// Wheel input no longer moves the page directly: it moves a target, and a
+// rAF loop eases the real scroll position toward it, so the page glides to
+// a stop after the wheel is released. Every scroll-driven effect (pipeline,
+// rail, reel, wall) inherits the easing for free because the actual
+// scrollTop is what animates.
+//
+// Native behavior is preserved for: touch devices (no wheel), scrollbar
+// drags and keyboard (resynced via the scroll listener), pinch-zoom
+// (ctrl+wheel), and wheel events over scrollable sub-elements (modals).
+
+function scrollsInside(el: Element | null): boolean {
+  let depth = 0;
+  while (el && el !== document.body && depth < 12) {
+    if (el.scrollHeight > el.clientHeight + 1) {
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === "auto" || oy === "scroll") return true;
+    }
+    el = el.parentElement;
+    depth++;
+  }
+  return false;
+}
+
+export function SmoothWheel() {
+  useEffect(() => {
+    if (REDUCED()) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
+    let target = window.scrollY;
+    let current = window.scrollY;
+    let rafId = 0;
+    let active = false;
+
+    const maxScroll = () =>
+      document.documentElement.scrollHeight - window.innerHeight;
+
+    function tick() {
+      current += (target - current) * 0.09;
+      if (Math.abs(target - current) < 0.5) {
+        current = target;
+        window.scrollTo(0, current);
+        active = false;
+        return;
+      }
+      window.scrollTo(0, current);
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function onWheel(e: WheelEvent) {
+      if (e.ctrlKey) return; // pinch-zoom
+      if (scrollsInside(e.target as Element)) return; // modals etc.
+      e.preventDefault();
+      const mult = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1;
+      target = Math.max(0, Math.min(maxScroll(), target + e.deltaY * mult));
+      if (!active) {
+        active = true;
+        current = window.scrollY;
+        rafId = requestAnimationFrame(tick);
+      }
+    }
+
+    // Scrollbar drags, keyboard, anchor jumps: adopt the position instead
+    // of fighting it
+    function onScroll() {
+      if (!active) target = current = window.scrollY;
+    }
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  return null;
+}
+
 // ── Scroll-velocity warp ───────────────────────────────────────────────────
 
 export function VelocityWarp({ children }: { children: React.ReactNode }) {
