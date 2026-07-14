@@ -186,12 +186,19 @@ export function SmoothWheel() {
     let current = window.scrollY;
     let rafId = 0;
     let active = false;
+    let lastT = 0;
 
     const maxScroll = () =>
       document.documentElement.scrollHeight - window.innerHeight;
 
-    function tick() {
-      current += (target - current) * 0.09;
+    // Glide decay rate per second (lower = floatier, longer coast).
+    // Time-based so the feel is identical on 60Hz and 144Hz displays.
+    const STIFFNESS = 3.4;
+
+    function tick(now: number) {
+      const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0.016);
+      lastT = now;
+      current += (target - current) * (1 - Math.exp(-STIFFNESS * dt));
       if (Math.abs(target - current) < 0.5) {
         current = target;
         window.scrollTo(0, current);
@@ -211,6 +218,7 @@ export function SmoothWheel() {
       if (!active) {
         active = true;
         current = window.scrollY;
+        lastT = 0;
         rafId = requestAnimationFrame(tick);
       }
     }
