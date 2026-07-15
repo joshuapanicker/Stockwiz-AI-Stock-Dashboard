@@ -424,7 +424,7 @@ export default function LandingPage() {
                 </span>
               ))}
             </span>
-            <span className="block uppercase tracking-tight text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
+            <span className="block uppercase tracking-tight text-[2.75rem] sm:text-6xl md:text-8xl leading-[1.02]" aria-label="One verdict.">
               {/* The judgment rises out of a clipped slot, shearing upright.
                   Campaign-poster combo: heavy grotesque for the connective
                   word, high-contrast serif for the impact word \u2014 colors

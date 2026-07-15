@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Monitor } from "lucide-react";
 import { GlitchText } from "./Effects";
+import { useIsMobile } from "../../hooks/useIsMobile";
 
 /**
  * "Where the verdicts land" — the terminal section, now a live demo reel
@@ -16,6 +17,12 @@ import { GlitchText } from "./Effects";
  *
  * Lazy-mounted: the ~26MB file isn't fetched until the section is within
  * 600px of the viewport. prefers-reduced-motion: static first frame.
+ *
+ * Mobile (< md): scroll-scrubbing a <video> via currentTime is unreliable
+ * on touch browsers (iOS won't seek smoothly without a gesture, Android
+ * stutters), and a 340vh pinned section becomes a dead, static scroll zone.
+ * So mobile gets a normal-height section where the reel simply autoplays
+ * and loops — the demo actually moves instead of freezing.
  */
 
 const CHAPTERS = [
@@ -33,6 +40,7 @@ export default function AppShowcase() {
   const [mounted, setMounted] = useState(false);
   const [ready, setReady] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const isMobile = useIsMobile();
 
   // Lazy-mount the <video> only once the section nears the viewport
   useEffect(() => {
@@ -47,7 +55,7 @@ export default function AppShowcase() {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isMobile) return;
     const section = sectionRef.current;
     const video = videoRef.current;
     if (!section || !video) return;
@@ -132,7 +140,64 @@ export default function AppShowcase() {
       video.removeEventListener("canplay", onCanPlay);
       vio.disconnect();
     };
-  }, [mounted]);
+  }, [mounted, isMobile]);
+
+  // Shared browser-chrome bar so mobile and desktop read identically
+  const chromeBar = (
+    <div className="absolute inset-x-0 top-0 z-10 h-9 bg-[#171C29]/95 border-b border-white/10 flex items-center gap-2 px-4">
+      <div className="flex gap-1.5">
+        <div className="w-2.5 h-2.5 rounded-full bg-red/60" />
+        <div className="w-2.5 h-2.5 rounded-full bg-orange/60" />
+        <div className="w-2.5 h-2.5 rounded-full bg-green/60" />
+      </div>
+      <div className="flex-1 max-w-xs mx-auto bg-card border border-border/40 rounded-md px-3 py-0.5 flex items-center justify-center gap-2">
+        <Monitor size={10} className="text-muted" />
+        <span className="text-[10px] text-muted">stockbrook.com</span>
+      </div>
+      <div className="w-16" aria-hidden />
+    </div>
+  );
+
+  // ── Mobile: normal-height section, the reel autoplays and loops ──
+  if (isMobile) {
+    const reduce = typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return (
+      <section ref={sectionRef} className="relative z-10 px-6 py-16">
+        <div className="text-center mb-7 max-w-2xl mx-auto">
+          <p className="font-mono text-[11px] tracking-[0.28em] text-red uppercase mb-3">The terminal</p>
+          <h2 className="font-display font-bold tracking-tight text-4xl text-white">
+            Where the verdicts <span className="text-gradient-signal">land.</span>
+          </h2>
+        </div>
+
+        {/* Chapter labels — static on mobile (no scroll scrub to drive them) */}
+        <div className="flex items-center justify-center gap-4 mb-5 font-mono text-[10px] tracking-[0.12em] uppercase">
+          {CHAPTERS.map(c => (
+            <span key={c.label} style={{ color: c.color }}>{c.label}</span>
+          ))}
+        </div>
+
+        <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl mx-auto"
+          style={{ aspectRatio: "16/9", background: "#10131A" }}>
+          {chromeBar}
+          {mounted && (
+            <video
+              ref={videoRef}
+              src="/videos/app-demo.mp4"
+              muted
+              loop
+              playsInline
+              autoPlay={!reduce}
+              controls={reduce}
+              preload="metadata"
+              className="absolute inset-0 w-full h-full object-cover pt-9"
+            />
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section ref={sectionRef} className="relative z-10" style={{ height: "340vh" }}>
@@ -159,18 +224,7 @@ export default function AppShowcase() {
         {/* The reel, framed in the app's own browser chrome */}
         <div className="relative w-full max-w-5xl rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
           style={{ aspectRatio: "16/9", background: "#10131A" }}>
-          <div className="absolute inset-x-0 top-0 z-10 h-9 bg-[#171C29]/95 border-b border-white/10 flex items-center gap-2 px-4">
-            <div className="flex gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-red/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-orange/60" />
-              <div className="w-2.5 h-2.5 rounded-full bg-green/60" />
-            </div>
-            <div className="flex-1 max-w-xs mx-auto bg-card border border-border/40 rounded-md px-3 py-0.5 flex items-center justify-center gap-2">
-              <Monitor size={10} className="text-muted" />
-              <span className="text-[10px] text-muted">stockbrook.com</span>
-            </div>
-            <div className="w-16" aria-hidden />
-          </div>
+          {chromeBar}
           {mounted && (
             <video
               ref={videoRef}
