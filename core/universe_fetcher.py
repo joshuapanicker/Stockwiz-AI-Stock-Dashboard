@@ -18,6 +18,9 @@ Strategy (scaled for the ~6,000-symbol US-listed universe)
 
 from __future__ import annotations
 
+import ctypes
+import ctypes.util
+import gc
 import math
 import os
 import threading
@@ -33,11 +36,28 @@ from core.universe_cache import (
 )
 from core.universe_symbols import refresh_universe_symbols
 
-# Tunables (env-overridable for the hosted deployment)
-PRICE_BATCH_SIZE = int(os.getenv("UNIVERSE_PRICE_BATCH", "100"))   # symbols per yf.download()
-INFO_WORKERS     = int(os.getenv("UNIVERSE_INFO_WORKERS", "8"))    # concurrent info fetches
+# Tunables (env-overridable for the hosted deployment). Defaults are sized for
+# a 512MB container: small batches keep each yf.download() DataFrame tiny and
+# a small worker pool limits concurrent info-parse memory and thread-arena
+# fragmentation. Bump these via env if running on a roomier host.
+PRICE_BATCH_SIZE = int(os.getenv("UNIVERSE_PRICE_BATCH", "25"))    # symbols per yf.download()
+INFO_WORKERS     = int(os.getenv("UNIVERSE_INFO_WORKERS", "3"))    # concurrent info fetches
 REQ_INTERVAL     = float(os.getenv("UNIVERSE_REQ_INTERVAL", "0.12"))  # min secs between request starts
 FULL_CYCLE_SLEEP = 3600     # re-check for stale data every hour
+
+
+def _trim_memory() -> None:
+    """Return freed heap to the OS after a chunk. pandas/yfinance churn leaves
+    glibc holding freed pages; malloc_trim(0) hands them back so RSS actually
+    falls between chunks instead of ratcheting up to the container limit.
+    No-op off glibc (e.g. musl/macOS/Windows)."""
+    gc.collect()
+    try:
+        libc = ctypes.CDLL(ctypes.util.find_library("c") or "libc.so.6", use_errno=True)
+        if hasattr(libc, "malloc_trim"):
+            libc.malloc_trim(0)
+    except Exception:
+        pass
 
 
 _stop_event = threading.Event()
@@ -236,6 +256,12 @@ def run_fetch_cycle(symbols: list[str] | None = None, force: bool = False) -> No
                     if _stop_event.is_set():
                         break
 
+                # Release this chunk's price DataFrame + info blobs and hand the
+                # freed pages back to the OS before starting the next batch, so
+                # sustained RSS stays flat instead of climbing to the OOM line.
+                del price_data, futures
+                _trim_memory()
+
     finally:
         with _lock:
             _progress["running"] = False
@@ -255,7 +281,16 @@ def _worker() -> None:
 
 
 def start_background_fetcher() -> None:
-    """Launch the background fetch thread (idempotent)."""
+    """Launch the background fetch thread (idempotent).
+
+    Global kill switch: set UNIVERSE_DISABLED=1 to skip the background fetcher
+    entirely (mirrors RAG_DISABLED). On a memory-starved container this is the
+    immediate pressure-relief lever — the screener then serves whatever the
+    universe cache already holds and fills lazily via normal per-symbol reads,
+    at the cost of full-universe coverage until re-enabled.
+    """
+    if os.getenv("UNIVERSE_DISABLED") == "1":
+        return
     global _thread
     if _thread and _thread.is_alive():
         return
