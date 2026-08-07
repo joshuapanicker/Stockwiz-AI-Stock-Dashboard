@@ -32,9 +32,23 @@ def _build_prompt(symbol: str, action: str, criteria_result: dict, metrics: dict
     news_section = news_ctx if news_ctx else "(no recent news available)"
     filing_section = f"\n{filing_ctx}\n" if filing_ctx else ""
 
+    # State the engine's own pass/fail verdict outright. A bare "2/5 met,
+    # need 2" reads as a failing score, and the model then justifies its
+    # answer with "insufficient criteria met (2/5)" — false when the
+    # threshold IS met, and contradicting the checklist the UI shows next to
+    # the verdict. Sell is where it bites: min_required is 2 of 5, so a met
+    # threshold almost always looks like a low fraction. The model may still
+    # decide against the action on fundamentals — that judgment is the point
+    # of asking it — it just may not misdescribe the criteria to justify it.
+    # Keep the footer rule about *describing* the status only: an earlier
+    # version added "deciding against it anyway is fine", which read as an
+    # invitation and destabilized borderline buys (AAPL at 4/5-need-4 went
+    # from a steady YES to 3 NO / 2 YES across five runs).
+    threshold = "MET" if criteria_result.get("passed") else "NOT MET"
+
     return f"""Analyze stock {symbol} for action: {action.upper()}.
 
-Criteria ({criteria_result.get('rules_met')}/{criteria_result.get('rules_total')} met, need {criteria_result.get('min_required')}):
+Criteria threshold {threshold} — {criteria_result.get('rules_met')} of {criteria_result.get('rules_total')} rules passed, {criteria_result.get('min_required')} required:
 {rules}
 
 Fundamentals: {json.dumps(data, separators=(',', ':'))}
@@ -54,7 +68,7 @@ Reasoning:
 - <reason 2>
 - <reason 3>
 
-Rules: use only provided data, say "missing" if absent, max 3 bullets."""
+Rules: use only provided data, say "missing" if absent, max 3 bullets. Describe the threshold status accurately — never call the criteria insufficient or unmet when it reads MET."""
 
 
 def _parse_decision(text: str) -> str | None:
