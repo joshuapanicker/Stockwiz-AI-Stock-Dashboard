@@ -123,19 +123,115 @@ def _strip_html(raw: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-# Item boundaries differ between 10-K and 10-Q. Patterns are intentionally
-# loose (case-insensitive) since filers format these headers inconsistently.
+def _compact(text: str) -> tuple[str, list[int]]:
+    """Lowercased, whitespace-free copy of `text`, plus a map from each of
+    its positions back to the corresponding index in the original.
+
+    Item headers are matched against this rather than the raw text. Filers'
+    HTML routinely leaves stray spaces *inside* words once tags are
+    stripped — Microsoft's 10-K heading comes through as "ITEM 1A. RIS K
+    FACTORS" (and "EXECUTIV E OFFICERS" elsewhere in the same document),
+    because each run of letters is its own styled span. No amount of `\\s+`
+    between tokens catches that; dropping whitespace entirely normalises
+    every such variation at once, including non-breaking spaces and the
+    line breaks that split headings across pages.
+    """
+    chars: list[str] = []
+    idx: list[int] = []
+    for i, ch in enumerate(text):
+        if not ch.isspace():
+            chars.append(ch)
+            idx.append(i)
+    return "".join(chars).lower(), idx
+
+
+# Written against the compacted text above, so no whitespace appears in any
+# pattern. `[.:]?` because filers punctuate item numbers both ways
+# ("Item 7." vs Shopify's "Item 7A:"), and `.{0,3}` absorbs whichever
+# apostrophe variant survived entity decoding.
+_MDA_TITLE = r"management.{0,3}sdiscussionandanalysis"
+
+# End boundaries name the *whole* next heading, title included, rather than
+# just its item number. The number alone matches the many places a filing
+# merely refers to the next item — Microsoft's 10-Q MD&A opens by pointing
+# at "Item 3 of this Form 10-Q", which under a bare `item3` pattern cut its
+# entire MD&A down to one chunk.
+# Filers vary the wording: AMD writes "Disclosure" singular, ServiceNow
+# reverses it to "Qualitative and Quantitative" in the body while its own
+# table of contents uses the standard order.
+_MARKET_RISK = (r"(?:quantitativeandqualitative|qualitativeandquantitative)"
+                r"disclosures?aboutmarketrisk")
+
 _SECTION_BOUNDARIES = {
-    ("10-K", "risk_factors"): (r"item\s+1a\.?\s+risk\s+factors", r"item\s+1b\.?\s"),
-    ("10-K", "mda"):          (r"item\s+7\.?\s+management.s\s+discussion", r"item\s+7a\.?\s"),
-    ("10-Q", "risk_factors"): (r"item\s+1a\.?\s+risk\s+factors", r"item\s+2\.?\s"),
-    ("10-Q", "mda"):          (r"item\s+2\.?\s+management.s\s+discussion", r"item\s+3\.?\s"),
+    ("10-K", "risk_factors"): (r"item1a[.:]?riskfactors",
+                               r"item1b[.:]?unresolvedstaffcomments"),
+    ("10-K", "mda"):          (r"item7[.:]?" + _MDA_TITLE,
+                               r"item7a[.:]?" + _MARKET_RISK),
+    ("10-Q", "risk_factors"): (r"item1a[.:]?riskfactors",
+                               r"item2[.:]?unregisteredsalesofequitysecurities"),
+    ("10-Q", "mda"):          (r"item2[.:]?" + _MDA_TITLE,
+                               r"item3[.:]?" + _MARKET_RISK),
 }
 
+# Some filers head the section with its title alone, no "Item N" prefix
+# (Shopify's 10-K). Only used when the prefixed form matches nothing, and
+# only for MD&A: its full title is long and distinctive, whereas a bare
+# "Risk Factors" occurs throughout ordinary prose and would match anywhere.
+_SECTION_FALLBACK = {
+    "mda": _MDA_TITLE + r"offinancialconditionandresultsofoperations",
+}
 
-_GENERIC_ITEM_PATTERN = re.compile(r"item\s+\d+[a-c]?\.?\s", re.IGNORECASE)
-_TOC_WINDOW = 600
+_GENERIC_ITEM_PATTERN = re.compile(r"item\d+[a-c]?")
+# Measured over compacted text, so this window is tight on purpose: in a
+# contents listing the next heading follows within a few dozen characters
+# (only a page number between them), while a real section body opens with
+# prose. Widening it starts counting the ordinary cross-references that a
+# genuine section makes in its first paragraph — at 600 it rejected
+# Alphabet's real MD&A, whose opening sentence cites four other items.
+_TOC_WINDOW = 200
 _TOC_DENSITY_THRESHOLD = 3  # 3+ other "Item N" mentions nearby = a TOC listing
+_MIN_SECTION = 2_000   # below this a boundary near a page number is a listing
+_MAX_SECTION = 20_000  # cap when the next heading is never found
+
+
+def _density(ctext: str, pos: int) -> int:
+    """How many other item headings crowd the span after `pos`.
+
+    A table-of-contents listing crams several into a small span; a real
+    section body has at most an occasional cross-reference. Used to tell a
+    heading in the TOC apart from the same heading over the real section.
+    """
+    return len(_GENERIC_ITEM_PATTERN.findall(ctext[pos:pos + _TOC_WINDOW]))
+
+
+def _find_end(ctext: str, start: int, end_pat: str) -> int | None:
+    """First end-boundary match that is a real section border.
+
+    `end_pat` already requires the next section's full heading, so the only
+    false border left is that heading appearing in a contents listing —
+    Goldman's MD&A opens with a block listing "Item 7A Quantitative and
+    Qualitative Disclosures About Market Risk 135", which taken as the
+    boundary truncated the bank's entire MD&A to a single chunk.
+
+    Two signals have to agree before a candidate is skipped, because either
+    alone throws away real boundaries. A page number right after the
+    heading is not enough: Datadog's genuine Item 2 heading is followed by
+    "65" from the page furniture. Nor is a short section: a 10-Q whose risk
+    factors say only "no material changes since our Form 10-K" is
+    legitimately a few hundred characters, and skipping its real boundary
+    would run the section on through the rest of the filing. Together they
+    are specific — a contents listing appears at the *top* of the section
+    it belongs to, so it both carries a page number and leaves nothing
+    behind it.
+    """
+    for m in re.finditer(end_pat, ctext[start:]):
+        if m.start() == 0:
+            continue  # the section's own heading
+        page_number = ctext[start + m.end():start + m.end() + 1].isdigit()
+        if page_number and m.start() < _MIN_SECTION:
+            continue
+        return start + m.start()
+    return None
 
 
 def extract_section(text: str, form: str, section: str) -> str | None:
@@ -143,29 +239,31 @@ def extract_section(text: str, form: str, section: str) -> str | None:
     if key not in _SECTION_BOUNDARIES:
         return None
     start_pat, end_pat = _SECTION_BOUNDARIES[key]
-    start_matches = list(re.finditer(start_pat, text, re.IGNORECASE))
-    if not start_matches:
+    ctext, cmap = _compact(text)
+
+    starts = list(re.finditer(start_pat, ctext))
+    if not starts:
+        fallback = _SECTION_FALLBACK.get(section)
+        if fallback:
+            starts = list(re.finditer(fallback, ctext))
+    if not starts:
         return None
 
-    # A table-of-contents listing crams several "Item N" headings into a
-    # small window (just page numbers between them); a real section body
-    # has at most an occasional cross-reference to another item nearby.
-    # Prefer whichever candidate has the FEWEST other "Item N" mentions in
-    # the following window, i.e. isn't part of a dense TOC listing.
-    best_start, best_density = None, None
-    for m in start_matches:
-        window = text[m.end(): m.end() + _TOC_WINDOW]
-        density = len(_GENERIC_ITEM_PATTERN.findall(window))
-        if best_density is None or density < best_density:
-            best_start, best_density = m.start(), density
-
-    if best_start is None or best_density >= _TOC_DENSITY_THRESHOLD:
-        return None  # even the best candidate still looks like a TOC listing
-
-    end_match = re.search(end_pat, text[best_start + 20:], re.IGNORECASE)
-    end = best_start + 20 + end_match.start() if end_match else min(best_start + 20_000, len(text))
-    section_text = text[best_start:end].strip()
-    return section_text if len(section_text) > 200 else None
+    # Try candidates least-TOC-like first, and fall through to the next one
+    # if this heading yields nothing usable.
+    for m in sorted(starts, key=lambda m: _density(ctext, m.end())):
+        if _density(ctext, m.end()) >= _TOC_DENSITY_THRESHOLD:
+            break  # sorted, so every remaining candidate is at least as dense
+        start = m.start()
+        end = _find_end(ctext, start, end_pat)
+        if end is None:
+            end = min(start + _MAX_SECTION, len(ctext))
+        if end - start < 200:
+            continue
+        section_text = text[cmap[start]:cmap[end - 1] + 1].strip()
+        if len(section_text) > 200:
+            return section_text
+    return None
 
 
 def fetch_filing_sections(symbol: str) -> list[dict]:
