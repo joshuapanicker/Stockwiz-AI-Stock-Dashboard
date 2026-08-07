@@ -63,23 +63,43 @@ answer — just a thinner one. Fixed in `core/filings.py` (73 tickers
 re-extracted: 68 gained, 0 regressed, 4021 → 4530 chunks), with the
 formatting variations covered offline in `tests/test_filings_extraction.py`.
 
+**Re-index — done.** `scripts/reindex_filings.py` was run against the
+production volume on 2026-08-06: **71 tickers gained, 55 unchanged, 9
+slightly reduced, 0 failed; 7,005 → 8,049 chunks in 62s.** 104 of 135
+tickers now have all four form/section combinations. Note that clearing
+`rag_fts_state.json` would *not* have been enough on its own — indexing is
+triggered by a ticker being analysed, and with no traffic nothing would
+have triggered it. Re-run the script after any change to
+`core/filings.py`.
+
 Remaining, in priority order:
 
-1. **Re-index so the fix takes effect.** Chunk counts only improve once a
-   ticker is re-indexed — on the 25-day `REINDEX_TTL`, or immediately if
-   `rag_fts_state.json` is cleared on the volume. `_index_ticker_inner`
-   deletes a ticker's rows before inserting, so forcing it is safe.
-2. **Widen the corpus, not the retrieval algorithm.** This is where the
+1. **Widen the corpus, not the retrieval algorithm.** This is where the
    remaining headroom is, and the extraction findings support it: quality
    is bounded by what's indexed, not by how it's ranked. Earnings-call
    transcripts or 8-Ks alongside the 10-K/10-Q sections.
-3. **Watch the disk volume, not RAM.** 500MB, 49% used by `universe.db`.
-   The FTS index is ~22MB and grew ~12% with this fix; still small, but
-   it is the constraint that binds now.
-4. **Consider a labelled retrieval eval** if the corpus widens — the
+2. **Watch the disk volume, not RAM.** 434MB usable, 46% used after the
+   re-index (up from 42%), mostly `universe.db`. The FTS index is ~39MB.
+   Still comfortable, but it is the constraint that binds now.
+3. **Consider a labelled retrieval eval** if the corpus widens — the
    diagnostic above measures whether queries *discriminate*, not whether
    the top chunk is the *right* one. That distinction only starts to
    matter once there are more document types to choose between.
+4. **A known extraction imperfection** is documented in
+   `core/filings.py`: where a filer punctuates cross-references exactly as
+   headings (American Water), a prose mention can outrank the real
+   heading, yielding a superset of the section. The obvious fix measures
+   worse. Revisit only with a discriminator that survives the head-to-head
+   harness.
+
+### How to validate a change to `core/filings.py`
+
+Compare **both extractors over the same freshly-fetched filing**, for
+every ticker in the production index — not the new extractor against rows
+already stored. Those rows were written at another time from possibly
+different filings, so a "gain" can be nothing but a newer filing and a
+real loss can hide completely. That mistake let a bug reach production
+that cut Albertsons' MD&A by two thirds.
 
 ## Track B — Fine-tuning toward replacing Claude
 
