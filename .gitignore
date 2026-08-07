@@ -53,3 +53,12 @@ AI_ARCHITECTURE.md
 
 # Design reference material (local inspiration only, never committed)
 referenceWebsites/
+
+# Test/coverage artifacts
+.coverage
+.pytest_cache/
+
+# Local tool state
+.claude-flow/
+.claude/
+ruvector.db
