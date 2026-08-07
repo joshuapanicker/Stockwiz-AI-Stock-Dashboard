@@ -162,15 +162,33 @@ _MDA_TITLE = r"management.{0,3}sdiscussionandanalysis"
 _MARKET_RISK = (r"(?:quantitativeandqualitative|qualitativeandquantitative)"
                 r"disclosures?aboutmarketrisk")
 
+# What separates an item number from its title. Albertsons uses a hyphen
+# ("Item 1B - Unresolved Staff Comments"), others a period, a colon, an
+# en/em dash, or nothing at all.
+_SEP = r"[.:\-–—]?"
+
 _SECTION_BOUNDARIES = {
-    ("10-K", "risk_factors"): (r"item1a[.:]?riskfactors",
-                               r"item1b[.:]?unresolvedstaffcomments"),
-    ("10-K", "mda"):          (r"item7[.:]?" + _MDA_TITLE,
-                               r"item7a[.:]?" + _MARKET_RISK),
-    ("10-Q", "risk_factors"): (r"item1a[.:]?riskfactors",
-                               r"item2[.:]?unregisteredsalesofequitysecurities"),
-    ("10-Q", "mda"):          (r"item2[.:]?" + _MDA_TITLE,
-                               r"item3[.:]?" + _MARKET_RISK),
+    ("10-K", "risk_factors"): (r"item1a" + _SEP + r"riskfactors",
+                               r"item1b" + _SEP + r"unresolvedstaffcomments"),
+    ("10-K", "mda"):          (r"item7" + _SEP + _MDA_TITLE,
+                               r"item7a" + _SEP + _MARKET_RISK),
+    ("10-Q", "risk_factors"): (r"item1a" + _SEP + r"riskfactors",
+                               r"item2" + _SEP + r"unregisteredsalesofequitysecurities"),
+    ("10-Q", "mda"):          (r"item2" + _SEP + _MDA_TITLE,
+                               r"item3" + _SEP + _MARKET_RISK),
+}
+
+# Last resort when the filer titles the next section in a way the patterns
+# above don't anticipate. Matching the bare item number is imprecise — it is
+# what the pre-2026-08 extractor did, and what a cross-reference fools — but
+# it beats the alternative of giving up and truncating at _MAX_SECTION,
+# which silently cut Albertsons' 148k-character MD&A to 23k. Guarded by the
+# same table-of-contents check used to pick a section's start.
+_END_FALLBACK = {
+    ("10-K", "risk_factors"): r"item1b" + _SEP,
+    ("10-K", "mda"):          r"item7a" + _SEP,
+    ("10-Q", "risk_factors"): r"item2" + _SEP,
+    ("10-Q", "mda"):          r"item3" + _SEP,
 }
 
 # Some filers head the section with its title alone, no "Item N" prefix
@@ -234,6 +252,24 @@ def _find_end(ctext: str, start: int, end_pat: str) -> int | None:
     return None
 
 
+def _find_end_loose(ctext: str, start: int, bare_pat: str) -> int | None:
+    """Bare item-number boundary, for filers whose heading wording the
+    titled patterns don't anticipate.
+
+    The number alone also matches every passing mention of the next item,
+    so candidates sitting in a contents listing are skipped by the same
+    density test used to choose a section's start. Imprecise, but the
+    alternative when nothing matches is truncating at _MAX_SECTION, which
+    is worse: it cut Albertsons' 148k-character MD&A down to 23k.
+    """
+    for m in re.finditer(bare_pat, ctext[start:]):
+        if m.start() == 0:
+            continue
+        if _density(ctext, start + m.end()) < _TOC_DENSITY_THRESHOLD:
+            return start + m.start()
+    return None
+
+
 def extract_section(text: str, form: str, section: str) -> str | None:
     key = (form, section)
     if key not in _SECTION_BOUNDARIES:
@@ -249,13 +285,25 @@ def extract_section(text: str, form: str, section: str) -> str | None:
     if not starts:
         return None
 
-    # Try candidates least-TOC-like first, and fall through to the next one
+    # Try candidates least-TOC-like first, falling through to the next one
     # if this heading yields nothing usable.
+    #
+    # Known imperfection: where a filer punctuates cross-references exactly
+    # as it punctuates headings ("consider Item 1A—Risk Factors in the Form
+    # 10-K", American Water), a reference in prose can outrank the real
+    # heading, since prose mentions few other items. Rejecting candidates
+    # that follow a lower-case letter looks like the fix and is not — real
+    # headings sit directly after the "Table of Contents" running header,
+    # so that test throws away more than it catches. The result is a
+    # superset of the section rather than the wrong section, so it is left
+    # alone until there is a discriminator that survives measurement.
     for m in sorted(starts, key=lambda m: _density(ctext, m.end())):
         if _density(ctext, m.end()) >= _TOC_DENSITY_THRESHOLD:
-            break  # sorted, so every remaining candidate is at least as dense
+            continue  # a contents listing, not the section itself
         start = m.start()
         end = _find_end(ctext, start, end_pat)
+        if end is None:
+            end = _find_end_loose(ctext, start, _END_FALLBACK[key])
         if end is None:
             end = min(start + _MAX_SECTION, len(ctext))
         if end - start < 200:

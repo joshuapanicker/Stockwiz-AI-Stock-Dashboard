@@ -169,6 +169,33 @@ def test_one_line_next_section_is_still_a_valid_boundary():
     assert "cybersecurity risk management program" not in got
 
 
+def test_hyphen_between_item_number_and_title():
+    """Albertsons writes "Item 1B - Unresolved Staff Comments"."""
+    text = toc() + "PART I Item 1A - Risk Factors " + RISK_BODY + (
+        "Item 1B - Unresolved Staff Comments None. Item 1C - Cybersecurity")
+    got = extract_section(text, "10-K", "risk_factors")
+    assert got is not None and "substantial and inherent" in got
+
+
+def test_unrecognised_end_wording_falls_back_to_the_item_number():
+    """The next section's *title* can be worded in ways these patterns
+    don't anticipate. When that happens the boundary has to fall back to
+    the bare item number, which is what the extractor did before 2026-08.
+    Giving up and truncating at the size cap instead is far worse: it cut
+    Albertsons' 148k-character MD&A down to 23k, losing most of it while
+    still looking like a successful extraction.
+    """
+    body = FILLER * 40      # must exceed the cap or the test proves nothing
+    assert len(body) > 30_000, "fixture too small to distinguish the two"
+    text = toc() + ("Item 7. Management's Discussion and Analysis of "
+                    "Financial Condition and Results of Operations ") + body + \
+        "Item 7A. Market Risk Disclosures Our exposure is described here."
+    got = extract_section(text, "10-K", "mda")
+    assert got is not None
+    assert "Market Risk Disclosures" not in got, "ran past the boundary"
+    assert len(got) > 30_000, "truncated at the cap instead of the boundary"
+
+
 def test_missing_end_heading_caps_rather_than_runs_away():
     text = toc() + "PART I Item 1A. Risk Factors " + RISK_BODY * 200
     got = extract_section(text, "10-K", "risk_factors")
